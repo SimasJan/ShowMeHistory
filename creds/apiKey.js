@@ -1,0 +1,1 @@
+export const googleVisionApiKey = 'AIzaSyDwWNEKtaQbiEWTBoxIl8i8gFFbgrSiS4w';

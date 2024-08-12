@@ -1,26 +1,52 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Text, View, TouchableOpacity, StyleSheet, Image } from 'react-native';
-import { CameraView, CameraType, useCameraPermissions } from 'expo-camera';
+import React, { useState, useRef, useEffect } from 'react'
+import { View, Text, TouchableOpacity, Image, StyleSheet, Button, ScrollView, SafeAreaView, FlatList } from 'react-native'
+import axios from 'axios'
+import * as ImagePicker from 'expo-image-picker'
+import * as FileSystem from 'expo-file-system'
+// import { googleVisionApiKey } from './apiKey'
+import { CameraView, useCameraPermissions } from 'expo-camera';
+import { CameraType, Camera } from 'expo-camera/legacy'
+
 
 function CameraScreen({ navigation }) {
-  const [hasPermission, setHasPermission] = useCameraPermissions();
+  const [imageUri, setImageUri] = useState(null)
+  const [labels, setLabels] = useState([])
   const [photo, setPhoto] = useState(null);
-  const cameraRef = useRef(CameraView);
+  const [hasPermission, setHasPermission] = useCameraPermissions();
+  const [showCamera, setShowCamera] = useState(false);
+  const cameraRef = useRef(null);
+  const [type, setType] = useState(CameraType.back);
 
-  useEffect(() => {
-    (async () => {
-      const { status } = await Camera.useCameraPermissions(); //useCameraPermissions();
-      setHasPermission(status === 'granted');
-    })();
-  }, []);
+
+  // useEffect(() => {
+  //   (async () => {
+  //     const { status } = await Camera.useCameraPermissions(); //useCameraPermissions();
+  //     setHasPermission(status === 'granted');
+  //   })();
+  // }, []);
+
+  // const takePicture = async () => {
+  //   if (cameraRef.current) {
+  //     const photo = await cameraRef.current.takePictureAsync();
+  //     // console.log('photo', photo);
+  //     setPhoto(photo);
+  //   }
+  // };
 
   const takePicture = async () => {
+    console.log('takePicture clicked!');
     if (cameraRef.current) {
       const photo = await cameraRef.current.takePictureAsync();
-      console.log('photo', photo);
+      console.log('takePicture photo: ', photo);
       setPhoto(photo);
+      setImageUri(photo.uri);
+      setShowCamera(false);
+      setLabels([]);          
+    } else {
+        alert('Camera not available')
     }
-  };
+};
+
 
   const retakePicture = () => {
     setPhoto(null);
@@ -54,7 +80,7 @@ function CameraScreen({ navigation }) {
               <Text style={styles.buttonText}>Retake</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.button} onPress={savePhoto}>
-              <Text style={styles.buttonText}>Save</Text>
+              <Text style={styles.buttonText}>Analyse</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -93,7 +119,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
     padding: 15,
     borderRadius: 30,
-    // marginHorizontal: 10,
+    marginHorizontal: 10,
     marginBottom: 40,
   },
   buttonText: {
@@ -109,7 +135,7 @@ const styles = StyleSheet.create({
   preview: {
     width: '100%',
     height: '80%',
-    resizeMode: 'contain',
+    resizeMode: 'cover',
   },
 });
 

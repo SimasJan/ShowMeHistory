@@ -15,6 +15,7 @@ export async function saveResult(photoUri, apiResults) {
       apiResults,
       feedback: null,
     });
+    console.log('[saveResult] result', result);
     await result.save();
   } catch (error) {
     console.error('Error saving result:', error);

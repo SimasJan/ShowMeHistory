@@ -1,39 +1,29 @@
-const API_URL = 'http://localhost:3000'; // Replace with your server's IP and port
+import axios from 'axios';
+import * as FileSystem from 'expo-file-system';
+
+const API_URL = 'http://192.168.143.208:3000'; // Replace with your server's IP and port
 
 export async function analyzeImage(imageUri) {
+  console.log('[visionApi] imageUri', imageUri);
   try {
-    const response = await fetch(`${API_URL}/analyze-image`, {
-      method: 'POST',
+    // convert image to base64
+    const base64Image = await FileSystem.readAsStringAsync(imageUri, { encoding: FileSystem.EncodingType.Base64 });
+
+    const response = await axios.post(`${API_URL}/api/analyze-image`, { image: base64Image }, {
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ imageUri }),
     });
+    console.log('[visionApi] response', response);
 
-    if (!response.ok) {
+    if (response.status !== 200) {
       throw new Error('Network response was not ok');
     }
 
-    const landmarks = await response.json();
+    const landmarks = await response.data;
     return landmarks;
   } catch (error) {
     console.error('Error analyzing image:', error);
     return null;
   }
 }
-
-// import vision from '@google-cloud/vision';
-
-// // You'll need to set up Google Cloud credentials properly
-// const client = new vision.ImageAnnotatorClient();
-
-// export async function analyzeImage(imageUri) {
-//   try {
-//     const [result] = await client.landmarkDetection(imageUri);
-//     const landmarks = result.landmarkAnnotations;
-//     return landmarks;
-//   } catch (error) {
-//     console.error('Error analyzing image:', error);
-//     return null;
-//   }
-// }
