@@ -1,10 +1,13 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, Image, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity } from 'react-native';
+import React, { useEffect, useState, useRef } from 'react';
+import { View, Text, Image, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity, Dimensions, Linking } from 'react-native';
 import axios from 'axios';
 import * as FileSystem from 'expo-file-system';
 import { googleVisionApiKey } from '../../creds/apiKey';
 import { Ionicons } from '@expo/vector-icons';
 import { searchHistoricPhotos } from '../services/historicPhotoService';
+import Carousel from 'react-native-snap-carousel';
+
+const { width: screenWidth } = Dimensions.get('window');
 
 function ResultsScreen({ route }) {
   const [photo, setPhoto] = useState(null);
@@ -16,6 +19,7 @@ function ResultsScreen({ route }) {
   const [historicPhotos, setHistoricPhotos] = useState([]);
   const [historicPhotosLoading, setHistoricPhotosLoading] = useState(true);
   const [historicPhotosError, setHistoricPhotosError] = useState(null);
+  const carouselRef = useRef(null);
 
   useEffect(() => {
     console.log('Route params:', route.params);
@@ -115,6 +119,28 @@ function ResultsScreen({ route }) {
     console.log(`User feedback: ${isPositive ? 'Positive' : 'Negative'}`);
   };
 
+  const handleSeeMore = (landmarkName) => {
+    const query = `${landmarkName} historic photo`;
+    const url = `https://www.google.com/search?tbm=isch&q=${encodeURIComponent(query)}`;
+    Linking.openURL(url);
+  };
+
+  const renderHistoricPhoto = ({ item, index }) => {
+    if (!item || !item.thumbnail) {
+      console.log('Invalid item:', item);
+      return null;
+    }
+    return (
+      <View style={styles.carouselItem}>
+        <Image source={{ uri: item.thumbnail }} style={styles.carouselImage} />
+        <View style={styles.carouselTextContainer}>
+          <Text style={styles.carouselTitle}>{item.title || 'No title'}</Text>
+          <Text style={styles.carouselSubtitle}>Source: {item.contextLink || 'Unknown'}</Text>
+        </View>
+      </View>
+    );
+  };
+
   if (!photo) {
     return (
       <View style={styles.container}>
@@ -157,15 +183,21 @@ function ResultsScreen({ route }) {
           ) : historicPhotos.length > 0 ? (
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Historic Photos</Text>
-              <ScrollView horizontal>
-                {historicPhotos.map((photo, index) => (
-                  <Image
-                    key={index}
-                    source={{ uri: photo.thumbnail }}
-                    style={styles.historicPhoto}
-                  />
-                ))}
-              </ScrollView>
+              {historicPhotos.length > 0 && (
+                <Carousel
+                  ref={carouselRef}
+                  data={historicPhotos}
+                  renderItem={renderHistoricPhoto}
+                  sliderWidth={screenWidth}
+                  itemWidth={screenWidth * 0.8}
+                  layout={'default'}
+                  removeClippedSubviews={false}
+                  useScrollView={true}
+                />
+              )}
+              <TouchableOpacity onPress={() => handleSeeMore(landmarks[0].name)} style={styles.seeMoreButton}>
+                <Text style={styles.seeMoreButtonText}>See More</Text>
+              </TouchableOpacity>
             </View>
           ) : (
             <Text>No historic photos found</Text>
@@ -260,11 +292,42 @@ const styles = StyleSheet.create({
   selectedFeedback: {
     backgroundColor: '#007AFF',
   },
-  historicPhoto: {
-    width: 150,
-    height: 150,
-    marginRight: 10,
+  carouselItem: {
+    backgroundColor: '#fff',
     borderRadius: 10,
+    overflow: 'hidden',
+    alignItems: 'center',
+  },
+  carouselImage: {
+    width: '100%',
+    height: 200,
+  },
+  carouselTextContainer: {
+    padding: 5,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    width: '100%',
+    position: 'absolute',
+    bottom: 0,
+  },
+  carouselTitle: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: 'white',
+  },
+  carouselSubtitle: {
+    fontSize: 10,
+    color: 'white',
+  },
+  seeMoreButton: {
+    marginTop: 10,
+    padding: 10,
+    backgroundColor: '#007AFF',
+    borderRadius: 5,
+    alignItems: 'center',
+  },
+  seeMoreButtonText: {
+    color: 'white',
+    fontSize: 16,
   },
 });
 
