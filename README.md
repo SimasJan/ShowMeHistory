@@ -27,3 +27,10 @@ Features:
     - site URLs that have matching images
     - URLs to Web images that partially or fully match the image in the request
     - URLs to visually similar images
+
+
+### App Resource Management
+
+- Pricing
+    - **[Custom Search JSON API](https://developers.google.com/custom-search/v1/overview)** provides *100 search queries per day for free*. If you need more, you may sign up for billing in the API Console. Additional requests cost $5 per 1000 queries, up to 10k queries per day.
+    - **[Google Vision API]()** provides *1000 queries per day for free*. If you need more, you may sign up for billing in the API Console. Additional requests cost $5 per 1000 queries, up to 10k queries per day.

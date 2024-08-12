@@ -4,6 +4,7 @@ import axios from 'axios';
 import * as FileSystem from 'expo-file-system';
 import { googleVisionApiKey } from '../../creds/apiKey';
 import { Ionicons } from '@expo/vector-icons';
+import { searchHistoricPhotos } from '../services/historicPhotoService';
 
 function ResultsScreen({ route }) {
   const [photo, setPhoto] = useState(null);
@@ -12,6 +13,9 @@ function ResultsScreen({ route }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [feedback, setFeedback] = useState(null);
+  const [historicPhotos, setHistoricPhotos] = useState([]);
+  const [historicPhotosLoading, setHistoricPhotosLoading] = useState(true);
+  const [historicPhotosError, setHistoricPhotosError] = useState(null);
 
   useEffect(() => {
     console.log('Route params:', route.params);
@@ -28,6 +32,13 @@ function ResultsScreen({ route }) {
       analyzeImage();
     }
   }, [photo]);
+
+  useEffect(() => {
+    if (landmarks.length > 0) {
+      console.log('Fetching historic photos for:', landmarks[0].name);
+      fetchHistoricPhotos(landmarks[0].name);
+    }
+  }, [landmarks]);
 
   const analyzeImage = async () => {
     try {
@@ -60,11 +71,13 @@ function ResultsScreen({ route }) {
       const { landmarkAnnotations, webDetection } = apiResponse.data.responses[0];
 
       if (landmarkAnnotations && landmarkAnnotations.length > 0) {
-        setLandmarks(landmarkAnnotations.map(landmark => ({
-          name: landmark.description,
-          country: landmark.locations[0].latLng.latitude > 0 ? 'Northern Hemisphere' : 'Southern Hemisphere',
-          confidence: landmark.score
-        })));
+        const detectedLandmarks = landmarkAnnotations.map(landmark => ({
+            name: landmark.description,
+            country: landmark.locations[0].latLng.latitude > 0 ? 'Northern Hemisphere' : 'Southern Hemisphere',
+            confidence: landmark.score
+        }));
+        console.log('Detected landmarks:', detectedLandmarks);
+        setLandmarks(detectedLandmarks);
       }
 
       if (webDetection && webDetection.webEntities && webDetection.webEntities.length > 0) {
@@ -79,6 +92,20 @@ function ResultsScreen({ route }) {
       setError('Error analyzing image. Please try again.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchHistoricPhotos = async (landmarkName) => {
+    setHistoricPhotosLoading(true);
+    try {
+      const photos = await searchHistoricPhotos(landmarkName);
+      setHistoricPhotos(photos);
+      console.log('Historic photos Set:', photos);
+    } catch (error) {
+      console.error('Error fetching historic photos:', error);
+      setHistoricPhotosError(error);
+    } finally {
+      setHistoricPhotosLoading(false);
     }
   };
 
@@ -125,6 +152,25 @@ function ResultsScreen({ route }) {
               ))}
             </View>
           )}
+          {historicPhotosLoading ? (
+            <ActivityIndicator size="large" color="#0000ff" />
+          ) : historicPhotos.length > 0 ? (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Historic Photos</Text>
+              <ScrollView horizontal>
+                {historicPhotos.map((photo, index) => (
+                  <Image
+                    key={index}
+                    source={{ uri: photo.thumbnail }}
+                    style={styles.historicPhoto}
+                  />
+                ))}
+              </ScrollView>
+            </View>
+          ) : (
+            <Text>No historic photos found</Text>
+          )}
+
           <View style={styles.feedbackContainer}>
             <Text style={styles.feedbackQuestion}>Was this information helpful?</Text>
             <View style={styles.feedbackButtons}>
@@ -213,6 +259,12 @@ const styles = StyleSheet.create({
   },
   selectedFeedback: {
     backgroundColor: '#007AFF',
+  },
+  historicPhoto: {
+    width: 150,
+    height: 150,
+    marginRight: 10,
+    borderRadius: 10,
   },
 });
 
