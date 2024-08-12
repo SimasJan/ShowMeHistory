@@ -4,10 +4,8 @@ import * as ImagePicker from 'expo-image-picker';
 
 
 function HomeScreen({ navigation }) {
-  const [imageUri, setImageUri] = useState(null)
-  const [labels, setLabels] = useState([])
 
-  const pickImage = async () => {
+ const pickImage = async () => {
     try { 
         let result = await ImagePicker.launchImageLibraryAsync({
             mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -16,13 +14,17 @@ function HomeScreen({ navigation }) {
             quality: 1,
         });
 
-        if (!result.canceled) {
-            setImageUri(result.assets[0].uri)
-            setLabels([])
+        console.log('[HomeScreen] picked image: ', result);
+
+        if (!result.canceled && result.assets && result.assets.length > 0) {
+          console.log('Navigating to Results with: ', { photo: { uri: result.assets[0].uri }});
+          navigation.navigate('Results', { photo: { uri: result.assets[0].uri } });
+        } else {
+          console.log('Image picking cancelled or no asset selected!');
         }
-        navigation.navigate('Results')
     } catch (error) {
-        console.log('Error reading an image: ', error)
+        console.log('Error reading an image: ', error);
+        alert('Error selecting image. Please try again');
     }
   };
 

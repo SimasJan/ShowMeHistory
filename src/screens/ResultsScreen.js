@@ -5,14 +5,27 @@ import * as FileSystem from 'expo-file-system';
 import { googleVisionApiKey } from '../../creds/apiKey';
 
 function ResultsScreen({ route }) {
-  const { photo } = route.params;
+  const [photo, setPhoto] = useState(null);
   const [landmark, setLandmark] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    analyzeImage();
-  }, []);
+    console.log('Route params:', route.params);
+    if (route.params && route.params.photo) {
+      setPhoto(route.params.photo);
+    } else {
+      setError('No photo provided');
+      setLoading(false);
+    }
+  }, [route.params]);
+
+  useEffect(() => {
+    if (photo) {
+      analyzeImage();
+    }
+  }, [photo]);
+
 
   const analyzeImage = async () => {
     try {
@@ -37,6 +50,7 @@ function ResultsScreen({ route }) {
           'Content-Type': 'application/json; charset=utf-8',
         }
       });
+      console.log('apiResponse.data.responses:\n', apiResponse.data.responses);
 
       const landmarkAnnotations = apiResponse.data.responses[0].landmarkAnnotations;
 
@@ -57,6 +71,14 @@ function ResultsScreen({ route }) {
     }
   };
 
+  if (!photo) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.errorText}>{error || 'Loading...'}</Text>
+      </View>
+    );
+  }
+
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <Image source={{ uri: photo.uri }} style={styles.image} />
@@ -76,6 +98,8 @@ function ResultsScreen({ route }) {
     </ScrollView>
   );
 }
+
+export default ResultsScreen;
 
 const styles = StyleSheet.create({
   container: {
@@ -118,5 +142,3 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 });
-
-export default ResultsScreen;
