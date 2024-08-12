@@ -18,21 +18,6 @@ function CameraScreen({ navigation }) {
   const [type, setType] = useState(CameraType.back);
 
 
-  // useEffect(() => {
-  //   (async () => {
-  //     const { status } = await Camera.useCameraPermissions(); //useCameraPermissions();
-  //     setHasPermission(status === 'granted');
-  //   })();
-  // }, []);
-
-  // const takePicture = async () => {
-  //   if (cameraRef.current) {
-  //     const photo = await cameraRef.current.takePictureAsync();
-  //     // console.log('photo', photo);
-  //     setPhoto(photo);
-  //   }
-  // };
-
   const takePicture = async () => {
     console.log('takePicture clicked!');
     if (cameraRef.current) {
@@ -114,12 +99,15 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   button: {
-    alignSelf: 'flex-end',
+    alignSelf: 'baseline',
     alignItems: 'center',
     backgroundColor: 'white',
-    padding: 15,
-    borderRadius: 30,
-    marginBottom: 40,
+    padding: 12,
+    borderRadius: 25,
+    margin: 10,
+    borderWidth: 1,
+    borderColor: 'blue',
+    width: 150,
   },
   buttonText: {
     fontSize: 15,

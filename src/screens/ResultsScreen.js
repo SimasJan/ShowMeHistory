@@ -40,7 +40,10 @@ function ResultsScreen({ route }) {
         requests: [
           {
             image: { content: base64Image },
-            features: [{ type: 'LANDMARK_DETECTION', maxResults: 1 }]
+            features: [
+              { type: 'LANDMARK_DETECTION', maxResults: 5 },
+              { type: 'WEB_DETECTION', maxResults: 3 }
+            ]
           }
         ],
       };

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { View, Text, Button, StyleSheet } from 'react-native';
+import { View, Text, Button, StyleSheet, TouchableOpacity, ImageBackground } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import { Ionicons } from '@expo/vector-icons';
 
 
 function HomeScreen({ navigation }) {
@@ -29,37 +30,44 @@ function HomeScreen({ navigation }) {
   };
 
   return (
-    <View style={styles.container}>
+    // <View style={styles.container}>
+      <ImageBackground source={require('../../assets/home-background.jpg')} style={styles.container}>
       <View style={styles.header}>
-        <Text style={{ fontSize: 20 }}>🏯 Show Me History 📜</Text>
-        <Text style={{ fontSize: 12, padding: 10, color: 'black'}}>Find historic photos of landmarks in front of you!</Text>
-        <Text style={{ fontSize: 15, padding: 10, marginTop: 20, color: 'black'}}>Start by taking a picture of a landmark 😎</Text>
+        <Text style={{ fontSize: 30, fontWeight: 'bold', color: 'white'}}>🏯 Show Me History 📜</Text>
+        <Text style={{ fontSize: 14, padding: 5, color: 'white'}}>Find historic photos of landmarks in front of you!</Text>
+        {/* <Text style={{ fontSize: 15, padding: 5, marginTop: 20, color: 'black'}}>Start by taking a picture of a landmark 😎</Text> */}
       </View>
       <View style={styles.buttonContainer}>
-        <Button
-          title="Take a Picture"
-          onPress={() => navigation.navigate('Camera')}
-        />
+        <TouchableOpacity style={styles.button}>
+          <Ionicons name="camera" size={24} color="black" />
+          <Text style={styles.buttonText} onPress={() => navigation.navigate('Camera')}>
+            Capture Photo
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.button}>
+          <Ionicons name="image" size={24} color="black" />
+          <Text style={styles.buttonText} onPress={pickImage}>Upload Photo</Text>
+        </TouchableOpacity>
       </View>
-      <View style={styles.buttonContainer}>
-        <Button
-          title="Upload a Photo"
-          onPress={pickImage}
-        />
+      <View>
+        <Text style={{ fontSize: 12, padding: 10, color: 'white', marginTop: '35%'}}>
+          Developed with ❤️ by <Text style={{ fontWeight: 'bold' }}>Simas</Text>
+        </Text>
       </View>
-    </View>
+      </ImageBackground>
+    // </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: 'white',
+    backgroundColor: 'transparent',
+    // backgroundImage: 'url(../../assets/home-background.jpg)',
+    backgroundSize: 'cover',
+    backgroundPosition: 'center',
     flex: 1,
-    // justifyContent: 'center',
     alignItems: 'center',
-    padding: 10, 
-    margin: 10, 
-    fontSize: 20, 
+    justifyContent: 'center',
   },
   header: {
     fontSize: 24,
@@ -69,12 +77,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   buttonContainer: {
-    width: 200,
-    margin: 10,
+    width: '75%',
+    flexDirection: 'column',
+    margin: 20,
+  },
+  button: {
     backgroundColor: 'white',
-    borderRadius: 10,
-    borderStyle: 'solid',
-    borderWidth: 1,
+    borderRadius: 20,
+    borderWidth: 2,
+    padding: 30,
+    margin: 30,
+    alignItems: 'center',
+  },
+  buttonText: {
+    fontSize: 16,
+    color: 'black',
   },
 });
 

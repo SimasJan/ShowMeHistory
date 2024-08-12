@@ -10,9 +10,13 @@ Let's say you are a tourist visiting a city and you want to know more about the 
 - discuss the results with other users*
 
 Features:
-- Internet Detection
-- Landmark Detection
-- Building Detection
+- [x] Landmark Detection
+- [ ] Web search
+- [ ] Building Detection
+- [ ] Historical Images
+- [ ] Historical Information
+- [ ] Upvote / Downvote
+- [ ] Discuss with other users
 
 
 ### Resources:
