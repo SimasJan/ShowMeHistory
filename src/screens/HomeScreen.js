@@ -38,15 +38,15 @@ function HomeScreen({ navigation }) {
         {/* <Text style={{ fontSize: 15, padding: 5, marginTop: 20, color: 'black'}}>Start by taking a picture of a landmark 😎</Text> */}
       </View>
       <View style={styles.buttonContainer}>
-        <TouchableOpacity style={styles.button}>
+        <TouchableOpacity style={styles.button} onPress={() => navigation.navigate('Camera')}>
           <Ionicons name="camera" size={24} color="black" />
-          <Text style={styles.buttonText} onPress={() => navigation.navigate('Camera')}>
+          <Text style={styles.buttonText}>
             Capture Photo
           </Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.button}>
+        <TouchableOpacity style={styles.button} onPress={pickImage}>
           <Ionicons name="image" size={24} color="black" />
-          <Text style={styles.buttonText} onPress={pickImage}>Upload Photo</Text>
+          <Text style={styles.buttonText} >Upload Photo</Text>
         </TouchableOpacity>
       </View>
       <View>
@@ -62,7 +62,6 @@ function HomeScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     backgroundColor: 'transparent',
-    // backgroundImage: 'url(../../assets/home-background.jpg)',
     backgroundSize: 'cover',
     backgroundPosition: 'center',
     flex: 1,
