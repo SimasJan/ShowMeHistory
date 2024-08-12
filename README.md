@@ -11,12 +11,21 @@ Let's say you are a tourist visiting a city and you want to know more about the 
 
 Features:
 - [x] Landmark Detection
-- [ ] Web search
-- [ ] Building Detection
-- [ ] Historical Images
+- [x] Web search
+- [x] Historical Images
 - [ ] Historical Information
-- [ ] Upvote / Downvote
-- [ ] Discuss with other users
+- [x] Upvote / Downvote
+- [ ] Discuss with other users*
+
+
+### Testing instructions
+
+1. Open the app
+2. Take a photo of a landmark or building. Preview the photo and Retake the photo if it is not clear or click Analyze to proceed.
+3. The app will analyze the photo and try to find the landmark or building.
+4. If the app is able to find the landmark or building, it will provide information about the landmark or building. Including historic photos, historical information, and other information.
+5. You can upvote or downvote the results.
+
 
 
 ### Resources:

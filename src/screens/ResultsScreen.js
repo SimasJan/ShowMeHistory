@@ -125,21 +125,18 @@ function ResultsScreen({ route }) {
     Linking.openURL(url);
   };
 
-  const renderHistoricPhoto = ({ item, index }) => {
-    if (!item || !item.thumbnail) {
-      console.log('Invalid item:', item);
-      return null;
-    }
+  const renderHistoricPhoto = ({ item }) => {
+    if (!item || !item.thumbnail) return null;
     return (
       <View style={styles.carouselItem}>
         <Image source={{ uri: item.thumbnail }} style={styles.carouselImage} />
         <View style={styles.carouselTextContainer}>
-          <Text style={styles.carouselTitle}>{item.title || 'No title'}</Text>
-          <Text style={styles.carouselSubtitle}>Source: {item.contextLink || 'Unknown'}</Text>
+          <Text style={styles.carouselTitle}>{item.title.replace('File:', '') || 'No title'}</Text>
         </View>
       </View>
     );
   };
+
 
   if (!photo) {
     return (
@@ -150,8 +147,9 @@ function ResultsScreen({ route }) {
   }
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <Image source={{ uri: photo.uri }} style={styles.image} />
+    <ScrollView style={styles.container}>
+      <Image source={{ uri: photo.uri }} style={styles.userPhoto} />
+      
       {loading ? (
         <ActivityIndicator size="large" color="#0000ff" />
       ) : error ? (
@@ -160,47 +158,47 @@ function ResultsScreen({ route }) {
         <View style={styles.resultContainer}>
           {landmarks.length > 0 && (
             <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Landmarks Detected</Text>
-              {landmarks.map((landmark, index) => (
-                <View key={index} style={styles.landmarkItem}>
-                  <Text style={styles.landmarkName}>{landmark.name}</Text>
-                  <Text style={styles.landmarkCountry}>{landmark.country}</Text>
-                  <Text style={styles.confidence}>Confidence: {(landmark.confidence * 100).toFixed(2)}%</Text>
-                </View>
-              ))}
+              <Text style={styles.sectionTitle}>Landmark Detected</Text>
+              <View style={styles.landmarkItem}>
+                <Text style={styles.landmarkName}>{landmarks[0].name}</Text>
+                <Text style={styles.landmarkCountry}>{landmarks[0].country}</Text>
+                <Text style={styles.confidence}>Confidence: {(landmarks[0].confidence * 100).toFixed(2)}%</Text>
+              </View>
             </View>
           )}
-          {webEntities.length > 0 && (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Web Entities</Text>
-              {webEntities.map((entity, index) => (
-                <Text key={index} style={styles.webEntity}>{entity.description}</Text>
-              ))}
-            </View>
-          )}
+
           {historicPhotosLoading ? (
             <ActivityIndicator size="large" color="#0000ff" />
           ) : historicPhotos.length > 0 ? (
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Historic Photos</Text>
-              {historicPhotos.length > 0 && (
-                <Carousel
-                  ref={carouselRef}
-                  data={historicPhotos}
-                  renderItem={renderHistoricPhoto}
-                  sliderWidth={screenWidth}
-                  itemWidth={screenWidth * 0.8}
-                  layout={'default'}
-                  removeClippedSubviews={false}
-                  useScrollView={true}
-                />
-              )}
-              <TouchableOpacity onPress={() => handleSeeMore(landmarks[0].name)} style={styles.seeMoreButton}>
+              <Carousel
+                ref={carouselRef}
+                data={historicPhotos}
+                renderItem={renderHistoricPhoto}
+                sliderWidth={screenWidth}
+                itemWidth={screenWidth * 0.8}
+                layout={'default'}
+                removeClippedSubviews={false}
+                useScrollView={true}
+              />
+              <TouchableOpacity onPress={() => handleSeeMore(landmarks[0]?.name)} style={styles.seeMoreButton}>
                 <Text style={styles.seeMoreButtonText}>See More</Text>
               </TouchableOpacity>
             </View>
           ) : (
-            <Text>No historic photos found</Text>
+            <Text style={styles.noResultText}>No historic photos found</Text>
+          )}
+
+          {webEntities.length > 0 && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Related Entities</Text>
+              <View style={styles.entitiesContainer}>
+                {webEntities.map((entity, index) => (
+                  <Text key={index} style={styles.entityItem}>{entity.description}</Text>
+                ))}
+              </View>
+            </View>
           )}
 
           <View style={styles.feedbackContainer}>
@@ -222,62 +220,109 @@ function ResultsScreen({ route }) {
 
 const styles = StyleSheet.create({
   container: {
-    flexGrow: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 20,
+    flex: 1,
+    backgroundColor: '#f5f5f5',
   },
-  image: {
+  userPhoto: {
     width: '100%',
-    height: 300,
-    resizeMode: 'contain',
-    marginBottom: 20,
+    height: 250,
+    resizeMode: 'cover',
   },
   resultContainer: {
-    width: '100%',
+    padding: 20,
   },
   section: {
-    marginBottom: 20,
-  },
-  sectionTitle: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    marginBottom: 10,
-  },
-  landmarkItem: {
-    backgroundColor: '#f0f0f0',
+    marginBottom: 25,
+    backgroundColor: 'white',
     borderRadius: 10,
     padding: 15,
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.23,
+    shadowRadius: 2.62,
+    elevation: 4,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
     marginBottom: 10,
+    color: '#333',
+  },
+  landmarkItem: {
+    backgroundColor: '#f9f9f9',
+    borderRadius: 8,
+    padding: 12,
   },
   landmarkName: {
     fontSize: 18,
     fontWeight: 'bold',
+    color: '#333',
   },
   landmarkCountry: {
     fontSize: 16,
-    color: '#555',
+    color: '#666',
+    marginTop: 4,
   },
   confidence: {
     fontSize: 14,
-    color: '#777',
+    color: '#888',
+    marginTop: 4,
   },
-  webEntity: {
-    fontSize: 16,
-    marginBottom: 5,
+  carouselItem: {
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    overflow: 'hidden',
   },
-  errorText: {
-    color: 'red',
+  carouselImage: {
+    width: '100%',
+    height: 200,
+    resizeMode: 'cover',
+  },
+  carouselTextContainer: {
+    padding: 10,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  carouselTitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: 'white',
+  },
+  seeMoreButton: {
+    marginTop: 10,
+    padding: 10,
+    backgroundColor: '#007AFF',
+    borderRadius: 5,
+    alignItems: 'center',
+  },
+  seeMoreButtonText: {
+    color: 'white',
     fontSize: 16,
-    textAlign: 'center',
+  },
+  entitiesContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+  entityItem: {
+    fontSize: 14,
+    color: '#007AFF',
+    backgroundColor: '#E1F5FE',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 15,
+    marginRight: 8,
+    marginBottom: 8,
   },
   feedbackContainer: {
     alignItems: 'center',
     marginTop: 20,
   },
   feedbackQuestion: {
-    fontSize: 18,
+    fontSize: 16,
     marginBottom: 10,
+    color: '#333',
   },
   feedbackButtons: {
     flexDirection: 'row',
@@ -292,42 +337,16 @@ const styles = StyleSheet.create({
   selectedFeedback: {
     backgroundColor: '#007AFF',
   },
-  carouselItem: {
-    backgroundColor: '#fff',
-    borderRadius: 10,
-    overflow: 'hidden',
-    alignItems: 'center',
-  },
-  carouselImage: {
-    width: '100%',
-    height: 200,
-  },
-  carouselTextContainer: {
-    padding: 5,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    width: '100%',
-    position: 'absolute',
-    bottom: 0,
-  },
-  carouselTitle: {
-    fontSize: 12,
-    fontWeight: 'bold',
-    color: 'white',
-  },
-  carouselSubtitle: {
-    fontSize: 10,
-    color: 'white',
-  },
-  seeMoreButton: {
-    marginTop: 10,
-    padding: 10,
-    backgroundColor: '#007AFF',
-    borderRadius: 5,
-    alignItems: 'center',
-  },
-  seeMoreButtonText: {
-    color: 'white',
+  errorText: {
+    color: 'red',
     fontSize: 16,
+    textAlign: 'center',
+    marginTop: 20,
+  },
+  noResultText: {
+    fontSize: 16,
+    textAlign: 'center',
+    color: '#666',
   },
 });
 
