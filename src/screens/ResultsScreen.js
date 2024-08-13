@@ -26,31 +26,52 @@ function ResultsScreen({ route }) {
   const carouselRef = useRef(null);
   const [imageHash, setImageHash] = useState(null);
   const [geminiResult, setGeminiResult] = useState(null);
+  const [isAnalysing, setIsAnalysing] = useState(false);
 
 
   useEffect(() => {
     console.log('Route params:', route.params);
     if (route.params && route.params.photo) {
       setPhoto(route.params.photo);
+      processImage(route.params.photo.uri);
     } else {
       setError('No photo provided');
       setLoading(false);
     }
   }, [route.params]);
+  
+  const processImage = async (uri) => {
+    try {
+      setLoading(true);
+      setIsAnalysing(true);
+      const hash = await generateImageHash(uri);
+      console.log('Generated image hash:', hash);
+      setImageHash(hash);
 
-  useEffect(() => {
-    if (photo) {
-      analyzeImage();
-      hashImage(route.params.photo.uri);
+      if (hash) {
+        const cachedResult = await getCachedResult(hash);
+        if (cachedResult) {
+          console.log('Using cached result');
+          updateStateWithCachedResult(cachedResult);
+          setLoading(false);
+          // Update in background
+          updateCachedResult(hash, uri);
+        } else {
+          console.log('No cached result found, analyzing image');
+          await analyzeImage(uri);
+        }
+      } else {
+        console.error('Failed to generate image hash');
+        throw new Error('Failed to generate image hash');
+      }
+    } catch (error) {
+      console.error('Error processing image:', error);
+      setError('Error processing image. Please try again.');
+    } finally {
+      setLoading(false);
+      setIsAnalysing(false);
     }
-  }, [photo]);
-
-  useEffect(() => {
-    if (landmarks.length > 0) {
-      console.log('Fetching historic photos for:', landmarks[0].name);
-      fetchHistoricPhotos(landmarks[0].name);
-    }
-  }, [landmarks]);
+  };
 
   const hashImage = async (uri) => {
     try {
@@ -77,34 +98,80 @@ function ResultsScreen({ route }) {
       setLoading(false);
     }
   };
+
+  const updateStateWithCachedResult = (cachedResult) => {
+    setLandmarks(cachedResult.landmarks || []);
+    setWebEntities(cachedResult.webEntities || []);
+    setHistoricPhotos(cachedResult.historicPhotos || []);
+    setGeminiResult(cachedResult.geminiResult);
+  };
+
+  const updateStateWithResult = (result) => {
+    setLandmarks(result.landmarks);
+    setWebEntities(result.webEntities);
+    setHistoricPhotos(result.historicPhotos);
+    setGeminiResult(result.geminiResult);
+
+    if (!result.landmarks.length && !result.webEntities.length) {
+      setError('No information detected in the image.');
+    } else {
+      setError(null);
+    }
+  };
+
+  const updateCachedResult = async (hash, uri) => {
+    try {
+      const updatedResult = await analyzeImage(uri, false);
+      if (updatedResult) {
+        await setCachedResult(hash, updatedResult);
+        updateStateWithCachedResult(updatedResult);
+      }
+    } catch (error) {
+      console.error('Error updating cached result:', error);
+    }
+  };
     
+  const setCachedResult = async (hash, data) => {
+    try {
+      const cacheData = {
+        ...data,
+        timestamp: Date.now(),
+      };
+      console.log('Caching data for hash:', hash);
+      await AsyncStorage.setItem(`@ImageAnalysis_${hash}`, JSON.stringify(cacheData));
+    } catch (error) {
+      console.error('Error caching data:', error);
+    }
+  };
+  
   const getCachedResult = async (hash) => {
     try {
       const cachedData = await AsyncStorage.getItem(`@ImageAnalysis_${hash}`);
-      return cachedData ? JSON.parse(cachedData) : null;
+      if (cachedData) {
+        const parsedData = JSON.parse(cachedData);
+        console.log('Found cached data for hash:', hash);
+        // Check if the cached data is not older than 24 hours
+        if (Date.now() - parsedData.timestamp < 24 * 60 * 60 * 1000) {
+          return parsedData;
+        } else {
+          console.log('Cached data is older than 24 hours, will reanalyze');
+        }
+      }
+      return null;
     } catch (error) {
       console.error('Error reading cached data:', error);
       return null;
     }
   };
-  
-  const setCachedResult = async (hash, data) => {
-    try {
-      await AsyncStorage.setItem(`@ImageAnalysis_${hash}`, JSON.stringify(data));
-    } catch (error) {
-      console.error('Error caching data:', error);
-    }
-  };
 
-  const analyzeImage = async () => {
+  const analyzeImage = async (uri, updateState = true) => {
     try {
-      setLoading(true);
       const apiUrl = `https://vision.googleapis.com/v1/images:annotate?key=${googleVisionApiKey}`;
-
-      const base64Image = await FileSystem.readAsStringAsync(photo.uri, { 
+  
+      const base64Image = await FileSystem.readAsStringAsync(uri, { 
         encoding: FileSystem.EncodingType.Base64
       });
-
+  
       const requestData = {
         requests: [
           {
@@ -116,63 +183,64 @@ function ResultsScreen({ route }) {
           }
         ],
       };
-
+  
       const apiResponse = await axios.post(apiUrl, requestData, {
         headers: {
           'Content-Type': 'application/json; charset=utf-8',
         }
       });
-      console.log('apiResponse.data.responses:\n', apiResponse.data.responses);
-
+      console.log('API Response received');
+  
       const { landmarkAnnotations, webDetection } = apiResponse.data.responses[0];
-
+  
+      let result = {
+        landmarks: [],
+        webEntities: [],
+        historicPhotos: [],
+        geminiResult: null
+      };
+  
       if (landmarkAnnotations && landmarkAnnotations.length > 0) {
-        const detectedLandmarks = landmarkAnnotations.map(landmark => ({
-            name: landmark.description,
-            country: landmark.locations[0].latLng.latitude > 0 ? 'Northern Hemisphere' : 'Southern Hemisphere',
-            position: `${landmark.locations[0].latLng.latitude?.toFixed(2)}, ${landmark.locations[0].latLng.longitude?.toFixed(2)}`,
-            confidence: landmark.score
+        result.landmarks = landmarkAnnotations.map(landmark => ({
+          name: landmark.description,
+          country: landmark.locations[0].latLng.latitude > 0 ? 'Northern Hemisphere' : 'Southern Hemisphere',
+          position: `${landmark.locations[0].latLng.latitude?.toFixed(2)}, ${landmark.locations[0].latLng.longitude?.toFixed(2)}`,
+          confidence: landmark.score
         }));
-        console.log('Detected landmarks:', detectedLandmarks);
-        setLandmarks(detectedLandmarks);
-        
+        console.log('Detected landmarks:', result.landmarks);
+  
         // Fetch Gemini AI information
         try {
-          const geminiInfo = await getGeminiInfo(detectedLandmarks[0].name);
-          setGeminiResult(geminiInfo);
+          result.geminiResult = await getGeminiInfo(result.landmarks[0].name);
         } catch (geminiError) {
           console.error('Error fetching Gemini information:', geminiError.message);
-          // Don't set an error state here, as we still want to show other results
+          result.geminiResult = null;
+        }
+  
+        // Fetch historic photos
+        try {
+          result.historicPhotos = await fetchHistoricPhotos(result.landmarks[0].name) || [];
+        } catch (historicPhotoError) {
+          console.error('Error fetching historic photos:', historicPhotoError);
+          result.historicPhotos = [];
         }
       }
-
+  
       if (webDetection && webDetection.webEntities && webDetection.webEntities.length > 0) {
-        setWebEntities(webDetection.webEntities.slice(0, 3));
+        result.webEntities = webDetection.webEntities.slice(0, 3);
+      }
+  
+      if (updateState) {
+        updateStateWithResult(result);
       }
 
-      if (!landmarkAnnotations && !webDetection) {
-        setError('No information detected in the image.');
-      }
-      // After successful analysis, cache the result
-      if (imageHash) {
-        await setCachedResult(imageHash, {
-            landmarks,
-            webEntities,
-            historicPhotos,
-        });
-      }
-
-      // Fetch historic photos
-      if (landmarks.length > 0) {
-        console.log('Fetching historic photos for:', landmarks[0].name);
-        await fetchHistoricPhotos(landmarks[0].name);
-      }
-      setLoading(false);
+      return result;     
     } catch (error) {
       console.error('Error analyzing image: ', error);
-      setError('Error analyzing image. Please try again.');
-    } finally {
-      setLoading(false);
+      if (updateState) {
+        setError('Error analyzing image. Please try again.');
+      }
+      return null;
     }
   };
 
@@ -180,14 +248,15 @@ function ResultsScreen({ route }) {
     setHistoricPhotosLoading(true);
     try {
       const photos = await searchHistoricPhotos(landmarkName);
-      setHistoricPhotos(photos);
-      console.log('Historic photos Set:', photos);
+      console.log('Historic photos fetched:', photos.length);
+      return photos;
     } catch (error) {
       console.error('Error fetching historic photos:', error);
       setHistoricPhotosError(error);
-    } finally {
-      setHistoricPhotosLoading(false);
     }
+    // } finally {
+    //   setHistoricPhotosLoading(false);
+    // }
   };
 
   const handleFeedback = (isPositive) => {
@@ -232,9 +301,14 @@ function ResultsScreen({ route }) {
       </ImageBackground>
 
       {loading ? (
-        <ActivityIndicator size="large" color="#0000ff" style={styles.loader}/>
+        <View style={styles.loaderContainer}>
+          <ActivityIndicator size="large" color="#0000ff" style={styles.loader}/>
+          <Text style={styles.loaderText}>{isAnalysing ? 'Analyzing image...' : 'Loading...'}</Text>
+        </View>
       ) : error ? (
-        <Text style={styles.errorText}>{error}</Text>
+        <View style={styles.section}>
+          <Text style={styles.errorText}>{error}</Text>
+        </View> 
       ) : (
         <View style={styles.resultContainer}>
           {landmarks.length > 0 && (
@@ -250,10 +324,8 @@ function ResultsScreen({ route }) {
               </View>
             </View>
           )}
-
-          {historicPhotosLoading ? (
-            <ActivityIndicator size="large" color="#0000ff" />
-          ) : historicPhotos.length > 0 ? (
+          
+          {historicPhotos.length > 0 ? (
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Historic Photos</Text>
               <Carousel
@@ -274,19 +346,25 @@ function ResultsScreen({ route }) {
               </TouchableOpacity>
             </View>
           ) : (
-            <Text style={styles.noResultText}>No historic photos found</Text>
+            <View style={styles.section}>
+              <Text style={styles.noResultText}>No historic photos found 😔</Text>
+            </View>
           )}
           
-          {geminiResult && (
+          {geminiResult ? (
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>About</Text>
               <ScrollView style={styles.geminiResultContainer}>
                 <Text style={styles.geminiResultText}>{geminiResult}</Text>
               </ScrollView>
             </View>
+          ) : (
+            <View style={styles.section}>
+              <Text style={styles.noResultText}>No 'About' information found 😔</Text>
+            </View>
           )}
 
-          {webEntities.length > 0 && (
+          {webEntities.length > 0 ? (
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Related Entities</Text>
               <View style={styles.entitiesContainer}>
@@ -296,6 +374,11 @@ function ResultsScreen({ route }) {
                     </TouchableOpacity>
                   ))}
               </View>
+            </View>
+          ) : 
+          (
+            <View style={styles.section}>
+              <Text style={styles.noResultText}>No 'Related Entities' found 😔</Text>
             </View>
           )}
 
@@ -474,7 +557,8 @@ const styles = StyleSheet.create({
     fontSize: 18,
     textAlign: 'center',
     color: '#666',
-    marginTop: 20,
+    // marginTop: 20,
+    padding: 10,
   },
   loader: {
     marginTop: 50,
@@ -487,5 +571,16 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#333',
     lineHeight: 24,
+  },
+  loaderContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 50,
+  },
+  loaderText: {
+    marginTop: 10,
+    fontSize: 16,
+    color: '#333',
   },
 });
