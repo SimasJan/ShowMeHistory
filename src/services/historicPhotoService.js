@@ -6,6 +6,26 @@ import { googleVisionApiKey } from '../../creds/apiKey'; // NOTE: same key uses 
 const GOOGLE_API_KEY = googleVisionApiKey;
 const SEARCH_ENGINE_ID = searchEngineID;
 
+const cleanTitle = (title) => {
+  // Remove common prefixes
+  title = title.replace(/^(File:|Image:)/, '').trim();
+  
+  // Remove file extensions
+  title = title.replace(/\.(jpg|jpeg|png|gif)$/i, '').trim();
+  
+  // Remove common suffixes
+  title = title.replace(/- Wikimedia Commons$/, '').trim();
+  
+  // Remove text after | or - if it contains common words
+  title = title.replace(/[\||-].*?(flickr|commons|wikimedia).*$/i, '').trim();
+  
+  // Capitalize first letter of each word
+  title = title.replace(/\w\S*/g, (txt) => txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase());
+  
+  return title;
+};
+
+
 export const searchHistoricPhotos = async (landmarkName) => {
     console.log('Searching for historic photos:', landmarkName);
   try {
@@ -26,7 +46,7 @@ export const searchHistoricPhotos = async (landmarkName) => {
       return response.data.items.map(item => ({
         url: item.link,
         thumbnail: item.image.thumbnailLink,
-        title: item.title,
+        title: cleanTitle(item.title),
         contextLink: item.image.contextLink,
       }));
     } else {

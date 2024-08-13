@@ -1,13 +1,14 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, Image, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity, Dimensions, Linking } from 'react-native';
+import { View, Text, Image, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity, Dimensions, Linking, ImageBackground } from 'react-native';
 import axios from 'axios';
 import * as FileSystem from 'expo-file-system';
 import { googleVisionApiKey } from '../../creds/apiKey';
 import { Ionicons } from '@expo/vector-icons';
 import { searchHistoricPhotos } from '../services/historicPhotoService';
 import Carousel from 'react-native-snap-carousel';
+import { BlurView } from 'expo-blur';
 
-const { width: screenWidth } = Dimensions.get('window');
+const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
 function ResultsScreen({ route }) {
   const [photo, setPhoto] = useState(null);
@@ -128,12 +129,12 @@ function ResultsScreen({ route }) {
   const renderHistoricPhoto = ({ item }) => {
     if (!item || !item.thumbnail) return null;
     return (
-      <View style={styles.carouselItem}>
+      <TouchableOpacity onPress={() => Linking.openURL(item.url)} style={styles.carouselItem}>
         <Image source={{ uri: item.thumbnail }} style={styles.carouselImage} />
-        <View style={styles.carouselTextContainer}>
+        <BlurView intensity={80} style={styles.carouselTextContainer}>
           <Text style={styles.carouselTitle}>{item.title.replace('File:', '') || 'No title'}</Text>
-        </View>
-      </View>
+        </BlurView>
+      </TouchableOpacity>
     );
   };
 
@@ -148,10 +149,14 @@ function ResultsScreen({ route }) {
 
   return (
     <ScrollView style={styles.container}>
-      <Image source={{ uri: photo.uri }} style={styles.userPhoto} />
-      
+      <ImageBackground source={{ uri: photo.uri }} style={styles.header}>
+        <BlurView intensity={70} style={styles.headerContent}>
+          <Text style={styles.headerTitle}>Results</Text>
+        </BlurView>
+      </ImageBackground>
+
       {loading ? (
-        <ActivityIndicator size="large" color="#0000ff" />
+        <ActivityIndicator size="large" color="#0000ff" style={styles.loader}/>
       ) : error ? (
         <Text style={styles.errorText}>{error}</Text>
       ) : (
@@ -162,6 +167,9 @@ function ResultsScreen({ route }) {
               <View style={styles.landmarkItem}>
                 <Text style={styles.landmarkName}>{landmarks[0].name}</Text>
                 <Text style={styles.landmarkCountry}>{landmarks[0].country}</Text>
+                <View style={styles.confidenceBar}>
+                  <View style={[styles.confidenceFill, { width: `${landmarks[0].confidence * 100}%` }]} />
+                </View>
                 <Text style={styles.confidence}>Confidence: {(landmarks[0].confidence * 100).toFixed(2)}%</Text>
               </View>
             </View>
@@ -179,6 +187,9 @@ function ResultsScreen({ route }) {
                 sliderWidth={screenWidth}
                 itemWidth={screenWidth * 0.8}
                 layout={'default'}
+                loop={true}
+                autoplay={true}
+                autoplayInterval={3000}
                 removeClippedSubviews={false}
                 useScrollView={true}
               />
@@ -195,8 +206,10 @@ function ResultsScreen({ route }) {
               <Text style={styles.sectionTitle}>Related Entities</Text>
               <View style={styles.entitiesContainer}>
                 {webEntities.map((entity, index) => (
-                  <Text key={index} style={styles.entityItem}>{entity.description}</Text>
-                ))}
+                    <TouchableOpacity key={index} style={styles.entityItem}>
+                      <Text style={styles.entityText}>{entity.description}</Text>
+                    </TouchableOpacity>
+                  ))}
               </View>
             </View>
           )}
@@ -218,15 +231,28 @@ function ResultsScreen({ route }) {
   );
 }
 
+export default ResultsScreen;
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f5f5f5',
   },
-  userPhoto: {
-    width: '100%',
-    height: 250,
-    resizeMode: 'cover',
+  contentContainer: {
+    paddingBottom: 40,
+  },
+  header: {
+    height: screenHeight * 0.3,
+    justifyContent: 'flex-end',
+  },
+  headerContent: {
+    padding: 20,
+    paddingTop: 40,
+  },
+  headerTitle: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    color: 'white',
   },
   resultContainer: {
     padding: 20,
@@ -234,46 +260,56 @@ const styles = StyleSheet.create({
   section: {
     marginBottom: 25,
     backgroundColor: 'white',
-    borderRadius: 10,
-    padding: 15,
+    borderRadius: 15,
+    padding: 20,
     shadowColor: "#000",
     shadowOffset: {
       width: 0,
-      height: 2,
+      height: 4,
     },
-    shadowOpacity: 0.23,
-    shadowRadius: 2.62,
-    elevation: 4,
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 5,
   },
   sectionTitle: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: 'bold',
-    marginBottom: 10,
+    marginBottom: 15,
     color: '#333',
   },
   landmarkItem: {
     backgroundColor: '#f9f9f9',
-    borderRadius: 8,
-    padding: 12,
+    borderRadius: 12,
+    padding: 15,
   },
   landmarkName: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: 'bold',
     color: '#333',
+    marginBottom: 5,
   },
   landmarkCountry: {
     fontSize: 16,
     color: '#666',
-    marginTop: 4,
+    marginBottom: 10,
+  },
+  confidenceBar: {
+    height: 6,
+    backgroundColor: '#e0e0e0',
+    borderRadius: 3,
+    marginBottom: 5,
+  },
+  confidenceFill: {
+    height: '100%',
+    backgroundColor: '#4CAF50',
+    borderRadius: 3,
   },
   confidence: {
     fontSize: 14,
     color: '#888',
-    marginTop: 4,
   },
   carouselItem: {
-    backgroundColor: '#fff',
-    borderRadius: 8,
+    borderRadius: 12,
     overflow: 'hidden',
   },
   carouselImage: {
@@ -282,46 +318,52 @@ const styles = StyleSheet.create({
     resizeMode: 'cover',
   },
   carouselTextContainer: {
-    padding: 10,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    padding: 15,
   },
   carouselTitle: {
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: 'bold',
     color: 'white',
   },
   seeMoreButton: {
-    marginTop: 10,
-    padding: 10,
+    marginTop: 15,
+    padding: 12,
     backgroundColor: '#007AFF',
-    borderRadius: 5,
+    borderRadius: 25,
     alignItems: 'center',
   },
   seeMoreButtonText: {
     color: 'white',
     fontSize: 16,
+    fontWeight: 'bold',
   },
   entitiesContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
   },
   entityItem: {
+    backgroundColor: '#E1F5FE',
+    paddingHorizontal: 15,
+    paddingVertical: 8,
+    borderRadius: 20,
+    marginRight: 10,
+    marginBottom: 10,
+  },
+  entityText: {
     fontSize: 14,
     color: '#007AFF',
-    backgroundColor: '#E1F5FE',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 15,
-    marginRight: 8,
-    marginBottom: 8,
   },
   feedbackContainer: {
     alignItems: 'center',
-    marginTop: 20,
+    marginTop: 30,
   },
   feedbackQuestion: {
-    fontSize: 16,
-    marginBottom: 10,
+    fontSize: 18,
+    marginBottom: 15,
     color: '#333',
   },
   feedbackButtons: {
@@ -330,24 +372,159 @@ const styles = StyleSheet.create({
   },
   feedbackButton: {
     backgroundColor: '#f0f0f0',
-    padding: 10,
-    borderRadius: 20,
-    marginHorizontal: 10,
+    padding: 15,
+    borderRadius: 30,
+    marginHorizontal: 15,
   },
   selectedFeedback: {
     backgroundColor: '#007AFF',
   },
   errorText: {
     color: 'red',
-    fontSize: 16,
+    fontSize: 18,
     textAlign: 'center',
     marginTop: 20,
   },
   noResultText: {
-    fontSize: 16,
+    fontSize: 18,
     textAlign: 'center',
     color: '#666',
+    marginTop: 20,
+  },
+  loader: {
+    marginTop: 50,
   },
 });
 
-export default ResultsScreen;
+
+// const styles = StyleSheet.create({
+//   container: {
+//     flex: 1,
+//     backgroundColor: '#f5f5f5',
+//   },
+//   userPhoto: {
+//     width: '100%',
+//     height: 250,
+//     resizeMode: 'cover',
+//   },
+//   resultContainer: {
+//     padding: 20,
+//   },
+//   section: {
+//     marginBottom: 25,
+//     backgroundColor: 'white',
+//     borderRadius: 10,
+//     padding: 15,
+//     shadowColor: "#000",
+//     shadowOffset: {
+//       width: 0,
+//       height: 2,
+//     },
+//     shadowOpacity: 0.23,
+//     shadowRadius: 2.62,
+//     elevation: 4,
+//   },
+//   sectionTitle: {
+//     fontSize: 20,
+//     fontWeight: 'bold',
+//     marginBottom: 10,
+//     color: '#333',
+//   },
+//   landmarkItem: {
+//     backgroundColor: '#f9f9f9',
+//     borderRadius: 8,
+//     padding: 12,
+//   },
+//   landmarkName: {
+//     fontSize: 18,
+//     fontWeight: 'bold',
+//     color: '#333',
+//   },
+//   landmarkCountry: {
+//     fontSize: 16,
+//     color: '#666',
+//     marginTop: 4,
+//   },
+//   confidence: {
+//     fontSize: 14,
+//     color: '#888',
+//     marginTop: 4,
+//   },
+//   carouselItem: {
+//     backgroundColor: '#fff',
+//     borderRadius: 8,
+//     overflow: 'hidden',
+//   },
+//   carouselImage: {
+//     width: '100%',
+//     height: 200,
+//     resizeMode: 'cover',
+//   },
+//   carouselTextContainer: {
+//     padding: 10,
+//     backgroundColor: 'rgba(0, 0, 0, 0.5)',
+//   },
+//   carouselTitle: {
+//     fontSize: 14,
+//     fontWeight: 'bold',
+//     color: 'white',
+//   },
+//   seeMoreButton: {
+//     marginTop: 10,
+//     padding: 10,
+//     backgroundColor: '#007AFF',
+//     borderRadius: 5,
+//     alignItems: 'center',
+//   },
+//   seeMoreButtonText: {
+//     color: 'white',
+//     fontSize: 16,
+//   },
+//   entitiesContainer: {
+//     flexDirection: 'row',
+//     flexWrap: 'wrap',
+//   },
+//   entityItem: {
+//     fontSize: 14,
+//     color: '#007AFF',
+//     backgroundColor: '#E1F5FE',
+//     paddingHorizontal: 10,
+//     paddingVertical: 5,
+//     borderRadius: 15,
+//     marginRight: 8,
+//     marginBottom: 8,
+//   },
+//   feedbackContainer: {
+//     alignItems: 'center',
+//     marginTop: 20,
+//   },
+//   feedbackQuestion: {
+//     fontSize: 16,
+//     marginBottom: 10,
+//     color: '#333',
+//   },
+//   feedbackButtons: {
+//     flexDirection: 'row',
+//     justifyContent: 'center',
+//   },
+//   feedbackButton: {
+//     backgroundColor: '#f0f0f0',
+//     padding: 10,
+//     borderRadius: 20,
+//     marginHorizontal: 10,
+//   },
+//   selectedFeedback: {
+//     backgroundColor: '#007AFF',
+//   },
+//   errorText: {
+//     color: 'red',
+//     fontSize: 16,
+//     textAlign: 'center',
+//     marginTop: 20,
+//   },
+//   noResultText: {
+//     fontSize: 16,
+//     textAlign: 'center',
+//     color: '#666',
+//   },
+// });
