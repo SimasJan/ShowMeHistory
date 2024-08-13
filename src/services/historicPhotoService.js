@@ -8,7 +8,7 @@ const SEARCH_ENGINE_ID = searchEngineID;
 
 const cleanTitle = (title) => {
   // Remove common prefixes
-  title = title.replace(/^(File:|Image:)/, '').trim();
+  title = title.replace(/^(File:|Image:|Free Images: )/, '').trim();
   
   // Remove file extensions
   title = title.replace(/\.(jpg|jpeg|png|gif)$/i, '').trim();

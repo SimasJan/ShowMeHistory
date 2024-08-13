@@ -7,6 +7,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { searchHistoricPhotos } from '../services/historicPhotoService';
 import Carousel from 'react-native-snap-carousel';
 import { BlurView } from 'expo-blur';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { generateImageHash } from '../utils/imageHash';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
@@ -21,6 +23,8 @@ function ResultsScreen({ route }) {
   const [historicPhotosLoading, setHistoricPhotosLoading] = useState(true);
   const [historicPhotosError, setHistoricPhotosError] = useState(null);
   const carouselRef = useRef(null);
+  const [imageHash, setImageHash] = useState(null);
+
 
   useEffect(() => {
     console.log('Route params:', route.params);
@@ -35,6 +39,7 @@ function ResultsScreen({ route }) {
   useEffect(() => {
     if (photo) {
       analyzeImage();
+      hashImage(route.params.photo.uri);
     }
   }, [photo]);
 
@@ -44,6 +49,50 @@ function ResultsScreen({ route }) {
       fetchHistoricPhotos(landmarks[0].name);
     }
   }, [landmarks]);
+
+  const hashImage = async (uri) => {
+    try {
+      const hash = await generateImageHash(uri);
+      setImageHash(hash);
+      if (hash) {
+        const cachedResult = await getCachedResult(hash);
+        if (cachedResult) {
+          // Use cached result
+          setLandmarks(cachedResult.landmarks);
+          setWebEntities(cachedResult.webEntities);
+          setHistoricPhotos(cachedResult.historicPhotos);
+          setLoading(false);
+        } else {
+          // Proceed with analysis
+          analyzeImage(uri);
+        }
+      } else {
+        throw new Error('Failed to generate image hash');
+      }
+    } catch (error) {
+      console.error('Error in hashImage:', error);
+      setError('Error processing image. Please try again.');
+      setLoading(false);
+    }
+  };
+    
+  const getCachedResult = async (hash) => {
+    try {
+      const cachedData = await AsyncStorage.getItem(`@ImageAnalysis_${hash}`);
+      return cachedData ? JSON.parse(cachedData) : null;
+    } catch (error) {
+      console.error('Error reading cached data:', error);
+      return null;
+    }
+  };
+  
+  const setCachedResult = async (hash, data) => {
+    try {
+      await AsyncStorage.setItem(`@ImageAnalysis_${hash}`, JSON.stringify(data));
+    } catch (error) {
+      console.error('Error caching data:', error);
+    }
+  };
 
   const analyzeImage = async () => {
     try {
@@ -92,6 +141,21 @@ function ResultsScreen({ route }) {
       if (!landmarkAnnotations && !webDetection) {
         setError('No information detected in the image.');
       }
+      // After successful analysis, cache the result
+      if (imageHash) {
+        await setCachedResult(imageHash, {
+            landmarks,
+            webEntities,
+            historicPhotos,
+        });
+      }
+
+      // Fetch historic photos
+      if (landmarks.length > 0) {
+        console.log('Fetching historic photos for:', landmarks[0].name);
+        await fetchHistoricPhotos(landmarks[0].name);
+      }
+      setLoading(false);
     } catch (error) {
       console.error('Error analyzing image: ', error);
       setError('Error analyzing image. Please try again.');
@@ -131,7 +195,7 @@ function ResultsScreen({ route }) {
     return (
       <TouchableOpacity onPress={() => Linking.openURL(item.url)} style={styles.carouselItem}>
         <Image source={{ uri: item.thumbnail }} style={styles.carouselImage} />
-        <BlurView intensity={80} style={styles.carouselTextContainer}>
+        <BlurView intensity={6} style={styles.carouselTextContainer}>
           <Text style={styles.carouselTitle}>{item.title.replace('File:', '') || 'No title'}</Text>
         </BlurView>
       </TouchableOpacity>
@@ -149,8 +213,8 @@ function ResultsScreen({ route }) {
 
   return (
     <ScrollView style={styles.container}>
-      <ImageBackground source={{ uri: photo.uri }} style={styles.header}>
-        <BlurView intensity={70} style={styles.headerContent}>
+      <ImageBackground source={{ uri: photo?.uri }} style={styles.header}>
+        <BlurView intensity={5} style={styles.headerContent}>
           <Text style={styles.headerTitle}>Results</Text>
         </BlurView>
       </ImageBackground>
@@ -184,8 +248,8 @@ function ResultsScreen({ route }) {
                 ref={carouselRef}
                 data={historicPhotos}
                 renderItem={renderHistoricPhoto}
-                sliderWidth={screenWidth}
-                itemWidth={screenWidth * 0.8}
+                sliderWidth={screenWidth * 0.8}
+                itemWidth={screenWidth * 0.6}
                 layout={'default'}
                 loop={true}
                 autoplay={true}
@@ -261,7 +325,7 @@ const styles = StyleSheet.create({
     marginBottom: 25,
     backgroundColor: 'white',
     borderRadius: 15,
-    padding: 20,
+    padding: 10,
     shadowColor: "#000",
     shadowOffset: {
       width: 0,
@@ -395,136 +459,3 @@ const styles = StyleSheet.create({
     marginTop: 50,
   },
 });
-
-
-// const styles = StyleSheet.create({
-//   container: {
-//     flex: 1,
-//     backgroundColor: '#f5f5f5',
-//   },
-//   userPhoto: {
-//     width: '100%',
-//     height: 250,
-//     resizeMode: 'cover',
-//   },
-//   resultContainer: {
-//     padding: 20,
-//   },
-//   section: {
-//     marginBottom: 25,
-//     backgroundColor: 'white',
-//     borderRadius: 10,
-//     padding: 15,
-//     shadowColor: "#000",
-//     shadowOffset: {
-//       width: 0,
-//       height: 2,
-//     },
-//     shadowOpacity: 0.23,
-//     shadowRadius: 2.62,
-//     elevation: 4,
-//   },
-//   sectionTitle: {
-//     fontSize: 20,
-//     fontWeight: 'bold',
-//     marginBottom: 10,
-//     color: '#333',
-//   },
-//   landmarkItem: {
-//     backgroundColor: '#f9f9f9',
-//     borderRadius: 8,
-//     padding: 12,
-//   },
-//   landmarkName: {
-//     fontSize: 18,
-//     fontWeight: 'bold',
-//     color: '#333',
-//   },
-//   landmarkCountry: {
-//     fontSize: 16,
-//     color: '#666',
-//     marginTop: 4,
-//   },
-//   confidence: {
-//     fontSize: 14,
-//     color: '#888',
-//     marginTop: 4,
-//   },
-//   carouselItem: {
-//     backgroundColor: '#fff',
-//     borderRadius: 8,
-//     overflow: 'hidden',
-//   },
-//   carouselImage: {
-//     width: '100%',
-//     height: 200,
-//     resizeMode: 'cover',
-//   },
-//   carouselTextContainer: {
-//     padding: 10,
-//     backgroundColor: 'rgba(0, 0, 0, 0.5)',
-//   },
-//   carouselTitle: {
-//     fontSize: 14,
-//     fontWeight: 'bold',
-//     color: 'white',
-//   },
-//   seeMoreButton: {
-//     marginTop: 10,
-//     padding: 10,
-//     backgroundColor: '#007AFF',
-//     borderRadius: 5,
-//     alignItems: 'center',
-//   },
-//   seeMoreButtonText: {
-//     color: 'white',
-//     fontSize: 16,
-//   },
-//   entitiesContainer: {
-//     flexDirection: 'row',
-//     flexWrap: 'wrap',
-//   },
-//   entityItem: {
-//     fontSize: 14,
-//     color: '#007AFF',
-//     backgroundColor: '#E1F5FE',
-//     paddingHorizontal: 10,
-//     paddingVertical: 5,
-//     borderRadius: 15,
-//     marginRight: 8,
-//     marginBottom: 8,
-//   },
-//   feedbackContainer: {
-//     alignItems: 'center',
-//     marginTop: 20,
-//   },
-//   feedbackQuestion: {
-//     fontSize: 16,
-//     marginBottom: 10,
-//     color: '#333',
-//   },
-//   feedbackButtons: {
-//     flexDirection: 'row',
-//     justifyContent: 'center',
-//   },
-//   feedbackButton: {
-//     backgroundColor: '#f0f0f0',
-//     padding: 10,
-//     borderRadius: 20,
-//     marginHorizontal: 10,
-//   },
-//   selectedFeedback: {
-//     backgroundColor: '#007AFF',
-//   },
-//   errorText: {
-//     color: 'red',
-//     fontSize: 16,
-//     textAlign: 'center',
-//     marginTop: 20,
-//   },
-//   noResultText: {
-//     fontSize: 16,
-//     textAlign: 'center',
-//     color: '#666',
-//   },
-// });
