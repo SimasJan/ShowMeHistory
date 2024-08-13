@@ -9,6 +9,7 @@ import Carousel from 'react-native-snap-carousel';
 import { BlurView } from 'expo-blur';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { generateImageHash } from '../utils/imageHash';
+import { getGeminiInfo } from '../services/geminiService';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
@@ -24,6 +25,7 @@ function ResultsScreen({ route }) {
   const [historicPhotosError, setHistoricPhotosError] = useState(null);
   const carouselRef = useRef(null);
   const [imageHash, setImageHash] = useState(null);
+  const [geminiResult, setGeminiResult] = useState(null);
 
 
   useEffect(() => {
@@ -128,10 +130,20 @@ function ResultsScreen({ route }) {
         const detectedLandmarks = landmarkAnnotations.map(landmark => ({
             name: landmark.description,
             country: landmark.locations[0].latLng.latitude > 0 ? 'Northern Hemisphere' : 'Southern Hemisphere',
+            position: `${landmark.locations[0].latLng.latitude?.toFixed(2)}, ${landmark.locations[0].latLng.longitude?.toFixed(2)}`,
             confidence: landmark.score
         }));
         console.log('Detected landmarks:', detectedLandmarks);
         setLandmarks(detectedLandmarks);
+        
+        // Fetch Gemini AI information
+        try {
+          const geminiInfo = await getGeminiInfo(detectedLandmarks[0].name);
+          setGeminiResult(geminiInfo);
+        } catch (geminiError) {
+          console.error('Error fetching Gemini information:', geminiError.message);
+          // Don't set an error state here, as we still want to show other results
+        }
       }
 
       if (webDetection && webDetection.webEntities && webDetection.webEntities.length > 0) {
@@ -230,7 +242,7 @@ function ResultsScreen({ route }) {
               <Text style={styles.sectionTitle}>Landmark Detected</Text>
               <View style={styles.landmarkItem}>
                 <Text style={styles.landmarkName}>{landmarks[0].name}</Text>
-                <Text style={styles.landmarkCountry}>{landmarks[0].country}</Text>
+                <Text style={styles.landmarkCountry}>{landmarks[0].country} ({landmarks[0].position})</Text>
                 <View style={styles.confidenceBar}>
                   <View style={[styles.confidenceFill, { width: `${landmarks[0].confidence * 100}%` }]} />
                 </View>
@@ -263,6 +275,15 @@ function ResultsScreen({ route }) {
             </View>
           ) : (
             <Text style={styles.noResultText}>No historic photos found</Text>
+          )}
+          
+          {geminiResult && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>About</Text>
+              <ScrollView style={styles.geminiResultContainer}>
+                <Text style={styles.geminiResultText}>{geminiResult}</Text>
+              </ScrollView>
+            </View>
           )}
 
           {webEntities.length > 0 && (
@@ -322,7 +343,7 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   section: {
-    marginBottom: 25,
+    marginBottom: 10,
     backgroundColor: 'white',
     borderRadius: 15,
     padding: 10,
@@ -336,15 +357,15 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   sectionTitle: {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: 'bold',
-    marginBottom: 15,
+    marginBottom: 10,
     color: '#333',
   },
   landmarkItem: {
     backgroundColor: '#f9f9f9',
     borderRadius: 12,
-    padding: 15,
+    padding: 1,
   },
   landmarkName: {
     fontSize: 20,
@@ -457,5 +478,14 @@ const styles = StyleSheet.create({
   },
   loader: {
     marginTop: 50,
+  },
+  geminiResultContainer: {
+    maxHeight: 200,
+    marginTop: 10,
+  },
+  geminiResultText: {
+    fontSize: 16,
+    color: '#333',
+    lineHeight: 24,
   },
 });

@@ -33,14 +33,14 @@ export const searchHistoricPhotos = async (landmarkName) => {
       params: {
         key: GOOGLE_API_KEY,
         cx: SEARCH_ENGINE_ID,
-        q: `${landmarkName} historic photo`,
+        q: `${landmarkName} historic photo, before`, // TODO: experiment with the query!
         searchType: 'image',
         num: 10,
         imgType: 'photo',
         rights: 'cc_publicdomain|cc_attribute|cc_sharealike',
       },
     });
-    console.log('=> Search Results:', response.data.items);
+    // console.log('=> Search Results:', response.data.items);
 
     if (response.data.items && response.data.items.length > 0) {
       return response.data.items.map(item => ({
