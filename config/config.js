@@ -7,7 +7,7 @@ export const Configuration = {
     },
     Urls: {
         searchHistoricPhotos: 'https://www.googleapis.com/customsearch/v1',
-        getGeminiInfo: 'https://api.gemini.com/v1/symbols',
+        generateContent: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent',
         googleVision: 'https://vision.googleapis.com/v1/images:annotate',
     },
     DetectionFeatures: [

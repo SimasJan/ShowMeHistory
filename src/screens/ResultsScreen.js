@@ -37,6 +37,7 @@ function ResultsScreen({ route }) {
     setFeedback(isPositive);
     // Here you would typically send this feedback to your backend
     console.log(`User feedback: ${isPositive ? 'Positive' : 'Negative'}`);
+    // TODO: Save user feedback to local storage. (NOTE: add user interaction timestamps too.)
   };
 
   const handleSeeMore = (landmarkName) => {
@@ -267,9 +268,7 @@ function ResultsScreen({ route }) {
               </View>
             )}
 
-            {loading ? (
-              <ActivityIndicator size="large" color="#0000ff" />
-            ) : analysisResult.historicPhotos.length > 0 ? (
+            {analysisResult.historicPhotos.length > 0 ? (
               <View style={styles.section}>
                 <Text style={styles.sectionTitle}>Historic Photos</Text>
                 <Carousel
@@ -293,7 +292,7 @@ function ResultsScreen({ route }) {
               <Text style={styles.noResultText}>No historic photos found 😔</Text>
             )}
 
-            {analysisResult.webEntities.length > 0 && (
+            {analysisResult.webEntities.length > 0 ? (
               <View style={styles.section}>
                 <Text style={styles.sectionTitle}>Related Entities</Text>
                 <View style={styles.entitiesContainer}>
@@ -304,6 +303,15 @@ function ResultsScreen({ route }) {
                       </TouchableOpacity>
                     ))}
                 </View>
+              </View>
+            ) : (
+              <Text style={styles.noResultText}>No related entities found 😔</Text>
+            )}
+
+            {analysisResult.geminiResult && (
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>About</Text>
+                <Text style={styles.entityText}>{analysisResult.geminiResult}</Text>
               </View>
             )}
 
@@ -485,7 +493,11 @@ const styles = StyleSheet.create({
     color: '#666',
     marginTop: 20,
   },
-  loader: {
-    marginTop: 50,
+  geminiInfo: {
+    fontSize: 18,
+    textAlign: 'center',
+    color: '#666',
+    marginTop: 20,
   },
+
 });

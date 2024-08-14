@@ -29,3 +29,7 @@ export const cleanTitle = (title) => {
     
     return title;
   };
+
+export const generatePrompt = (landmarkName) => {
+    return `Write a summary of a historic landmark ${landmarkName} in 3-5 sentences and mentions 2-4 key facts.`;
+}

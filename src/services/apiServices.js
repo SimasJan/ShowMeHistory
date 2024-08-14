@@ -1,6 +1,6 @@
 import axios from 'axios';
 // import { googleVisionApiKey, searchEngineID, geminiApiKey } from '../../creds/apiKeys';
-import { handleErrorMessage, cleanTitle } from '../utils/utils';
+import { handleErrorMessage, cleanTitle, generatePrompt } from '../utils/utils';
 import { Configuration } from '../../config/config';
 
 export const ApiService = {
@@ -29,14 +29,15 @@ export const ApiService = {
         try {
             const prompt = generatePrompt(landmarkName);
             console.log('Prompt:', prompt);
-            const response = await axios.post(`${GEMINI_API_ENDPOINT}?key=${geminiApiKey}`,
+            const response = await axios.post(`${Configuration.Urls.generateContent}?key=${Configuration.ApiKeys.geminiApiKey}`,
                 { contents: [{ parts: [{ text: prompt }] }] }
             );
-            
-            if (response.data && response.data.candidates && response.data.candidates.length > 0 && response.data.candidates.content > 0) {
-              return response.data.candidates.content.parts[0].text;
+            console.log('getGeminiInfo.response: ', response.data.candidates[0].content.parts[0].text);
+
+            if (response.data && response.data.candidates && response.data.candidates.length > 0) {
+                return response.data.candidates[0].content.parts[0].text 
             } else {
-              console.log('No valid response content from Gemini AI');
+              console.log('No valid response content from Gemini AI', response.data);
               return null;
             }
           } catch (error) {
