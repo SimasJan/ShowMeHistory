@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, Button, StyleSheet, TouchableOpacity, ImageBackground } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 
 function HomeScreen({ navigation }) {
@@ -15,13 +16,14 @@ function HomeScreen({ navigation }) {
             quality: 1,
         });
 
-        console.log('[HomeScreen] picked image: ', result);
+        // console.log('[HomeScreen] picked image: ', result);
 
         if (!result.canceled && result.assets && result.assets.length > 0) {
-          console.log('Navigating to Results with: ', { photo: { uri: result.assets[0].uri }});
+          // console.log('Navigating to Results with: ', { photo: { uri: result.assets[0].uri }});
           navigation.navigate('Results', { photo: { uri: result.assets[0].uri } });
         } else {
-          console.log('Image picking cancelled or no asset selected!');
+          alert('No image selected');
+          // console.log('Image picking cancelled or no asset selected!');
         }
     } catch (error) {
         console.log('Error reading an image: ', error);
@@ -29,8 +31,8 @@ function HomeScreen({ navigation }) {
     }
   };
 
-  return (
-    // <View style={styles.container}>
+  return (    
+    <SafeAreaView style={styles.mainContainer}>
       <ImageBackground source={require('../../assets/home-background.jpg')} style={styles.container}>
       <View style={styles.header}>
         <Text style={{ fontSize: 30, fontWeight: 'bold', color: 'white'}}>🏯 Show Me History</Text>
@@ -52,14 +54,18 @@ function HomeScreen({ navigation }) {
       <View>
         <Text style={{ fontSize: 12, padding: 10, color: 'white', marginTop: '35%'}}>
           Developed with ❤️ by <Text style={{ fontWeight: 'bold' }}>Simas</Text>
+          {/* TODO: Add a donate button! Will open a browser to payment page to support the project! */}
         </Text>
       </View>
       </ImageBackground>
-    // </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  mainContainer: {
+    flex: 1,
+  },
   container: {
     backgroundColor: 'transparent',
     backgroundSize: 'cover',
