@@ -198,10 +198,14 @@ function ResultsScreen({ route }) {
     const results = [...landmarks];
 
     webEntities.forEach(entity => {
-      const matchingLandmark = landmarks.find(landmark =>
-        landmark.name.toLowerCase().includes(entity.name.toLowerCase()) ||
-        entity.name.toLowerCase().includes(landmark.name.toLowerCase())
-      );
+      const matchingLandmark = landmarks.find((landmark) => {
+        try {
+          landmark.name.toLowerCase().includes(entity.name.toLowerCase()) ||
+          entity.name.toLowerCase().includes(landmark.name.toLowerCase())
+        } catch (error) {
+          console.error('Error comparing landmarks:', error);
+        }
+      });
 
       if (matchingLandmark) {
         matchingLandmark.confidence = Math.max(matchingLandmark.confidence, entity.confidence);
@@ -231,6 +235,14 @@ function ResultsScreen({ route }) {
       setAnalysisResult(updatedResult);
     } catch (error) {
       console.error('Error updating analysis in background:', error);
+    }
+  };
+
+  const handleConfidenceValue = (value) => {
+    if (value * 100 > 100) {
+      return 100
+    } else {
+      return value * 100
     }
   };
 
@@ -265,9 +277,9 @@ function ResultsScreen({ route }) {
                   <Text style={styles.landmarkName}>{analysisResult.landmarks[0].name}</Text>
                   <Text style={styles.landmarkCountry}>{analysisResult.landmarks[0].country} ({analysisResult.landmarks[0].position?.lat}, {analysisResult.landmarks[0].position?.long})</Text>
                   <View style={styles.confidenceBar}>
-                    <View style={[styles.confidenceFill, { width: `${analysisResult.landmarks[0].confidence * 100}%` }]} />
+                    <View style={[styles.confidenceFill, { width: `${handleConfidenceValue(analysisResult.landmarks[0].confidence)}%` }]} />
                   </View>
-                  <Text style={styles.confidence}>Confidence: {(analysisResult.landmarks[0].confidence * 100).toFixed(2)}%</Text>
+                  <Text style={styles.confidence}>Confidence: {(handleConfidenceValue(analysisResult.landmarks[0].confidence)).toFixed(2)}%</Text>
                 </View>
               </View>
             )}
@@ -293,16 +305,20 @@ function ResultsScreen({ route }) {
                 </TouchableOpacity>
               </View>
             ) : (
-              <Text style={styles.noResultText}>No historic photos found 😔</Text>
+              <View style={styles.section}>
+                <Text style={styles.noResultText}>No historic photos found 😔</Text>
+              </View>
             )}
 
-            {analysisResult.geminiResult.length > 0  ? (
+            {analysisResult.geminiResult && analysisResult.geminiResult.length > 0  ? (
               <View style={styles.section}>
                 <Text style={styles.sectionTitle}>About</Text>
                 <Text style={styles.geminiInfo}>{analysisResult.geminiResult}</Text>
               </View>
             ) : (
-              <Text style={styles.noResultText}>No about information found 😔</Text>
+              <View style={styles.section}>
+                <Text style={styles.noResultText}>No about information found 😔</Text>
+              </View>
             )}
 
             {analysisResult.webEntities.length > 0 ? (
@@ -318,7 +334,9 @@ function ResultsScreen({ route }) {
                 </View>
               </View>
             ) : (
-              <Text style={styles.noResultText}>No related entities found 😔</Text>
+              <View style={styles.section}>
+                <Text style={styles.noResultText}>No related entities found 😔</Text>
+              </View>
             )}
 
             <View style={styles.feedbackContainer}>
