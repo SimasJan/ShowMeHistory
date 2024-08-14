@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, Button, StyleSheet, TouchableOpacity, ImageBackground } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 
 function HomeScreen({ navigation }) {
@@ -15,10 +16,8 @@ function HomeScreen({ navigation }) {
             quality: 1,
         });
 
-        console.log('[HomeScreen] picked image: ', result);
-
         if (!result.canceled && result.assets && result.assets.length > 0) {
-          console.log('Navigating to Results with: ', { photo: { uri: result.assets[0].uri }});
+          // console.log('Navigating to Results with: ', { photo: { uri: result.assets[0].uri }});
           navigation.navigate('Results', { photo: { uri: result.assets[0].uri } });
         } else {
           console.log('Image picking cancelled or no asset selected!');
@@ -30,7 +29,7 @@ function HomeScreen({ navigation }) {
   };
 
   return (
-    // <View style={styles.container}>
+    <SafeAreaView style={{ flex: 1}}>
       <ImageBackground source={require('../../assets/home-background.jpg')} style={styles.container}>
       <View style={styles.header}>
         <Text style={{ fontSize: 30, fontWeight: 'bold', color: 'white'}}>🏯 Show Me History 📜</Text>
@@ -55,7 +54,7 @@ function HomeScreen({ navigation }) {
         </Text>
       </View>
       </ImageBackground>
-    // </View>
+    </SafeAreaView>
   );
 }
 

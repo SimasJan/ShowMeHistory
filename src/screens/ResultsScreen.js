@@ -7,6 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { searchHistoricPhotos } from '../services/historicPhotoService';
 import Carousel from 'react-native-snap-carousel';
 import { BlurView } from 'expo-blur';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
@@ -105,9 +106,9 @@ function ResultsScreen({ route }) {
     try {
       const photos = await searchHistoricPhotos(landmarkName);
       setHistoricPhotos(photos);
-      console.log('Historic photos Set:', photos);
+      console.log('Historic photos found: ', photos.length);
     } catch (error) {
-      console.error('Error fetching historic photos:', error);
+      console.error('Error fetching historic photos:', error.message);
       setHistoricPhotosError(error);
     } finally {
       setHistoricPhotosLoading(false);
@@ -148,86 +149,89 @@ function ResultsScreen({ route }) {
   }
 
   return (
-    <ScrollView style={styles.container}>
-      <ImageBackground source={{ uri: photo.uri }} style={styles.header}>
-        <BlurView intensity={70} style={styles.headerContent}>
-          <Text style={styles.headerTitle}>Results</Text>
-        </BlurView>
-      </ImageBackground>
+    <SafeAreaView style={{ flex: 1}}>
+      <ScrollView style={styles.container}>
 
-      {loading ? (
-        <ActivityIndicator size="large" color="#0000ff" style={styles.loader}/>
-      ) : error ? (
-        <Text style={styles.errorText}>{error}</Text>
-      ) : (
-        <View style={styles.resultContainer}>
-          {landmarks.length > 0 && (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Landmark Detected</Text>
-              <View style={styles.landmarkItem}>
-                <Text style={styles.landmarkName}>{landmarks[0].name}</Text>
-                <Text style={styles.landmarkCountry}>{landmarks[0].country}</Text>
-                <View style={styles.confidenceBar}>
-                  <View style={[styles.confidenceFill, { width: `${landmarks[0].confidence * 100}%` }]} />
+        <ImageBackground source={{ uri: photo.uri }} style={styles.header}>
+          <BlurView intensity={70} style={styles.headerContent}>
+            <Text style={styles.headerTitle}>Results</Text>
+          </BlurView>
+        </ImageBackground>
+
+        {loading ? (
+          <ActivityIndicator size="large" color="#0000ff" style={styles.loader}/>
+        ) : error ? (
+          <Text style={styles.errorText}>{error}</Text>
+        ) : (
+          <View style={styles.resultContainer}>
+            {landmarks.length > 0 && (
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Landmark Detected</Text>
+                <View style={styles.landmarkItem}>
+                  <Text style={styles.landmarkName}>{landmarks[0].name}</Text>
+                  <Text style={styles.landmarkCountry}>{landmarks[0].country}</Text>
+                  <View style={styles.confidenceBar}>
+                    <View style={[styles.confidenceFill, { width: `${landmarks[0].confidence * 100}%` }]} />
+                  </View>
+                  <Text style={styles.confidence}>Confidence: {(landmarks[0].confidence * 100).toFixed(2)}%</Text>
                 </View>
-                <Text style={styles.confidence}>Confidence: {(landmarks[0].confidence * 100).toFixed(2)}%</Text>
               </View>
-            </View>
-          )}
+            )}
 
-          {historicPhotosLoading ? (
-            <ActivityIndicator size="large" color="#0000ff" />
-          ) : historicPhotos.length > 0 ? (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Historic Photos</Text>
-              <Carousel
-                ref={carouselRef}
-                data={historicPhotos}
-                renderItem={renderHistoricPhoto}
-                sliderWidth={screenWidth}
-                itemWidth={screenWidth * 0.8}
-                layout={'default'}
-                loop={true}
-                autoplay={true}
-                autoplayInterval={3000}
-                removeClippedSubviews={false}
-                useScrollView={true}
-              />
-              <TouchableOpacity onPress={() => handleSeeMore(landmarks[0]?.name)} style={styles.seeMoreButton}>
-                <Text style={styles.seeMoreButtonText}>See More</Text>
-              </TouchableOpacity>
-            </View>
-          ) : (
-            <Text style={styles.noResultText}>No historic photos found</Text>
-          )}
-
-          {webEntities.length > 0 && (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Related Entities</Text>
-              <View style={styles.entitiesContainer}>
-                {webEntities.map((entity, index) => (
-                    <TouchableOpacity key={index} style={styles.entityItem}>
-                      <Text style={styles.entityText}>{entity.description}</Text>
-                    </TouchableOpacity>
-                  ))}
+            {historicPhotosLoading ? (
+              <ActivityIndicator size="large" color="#0000ff" />
+            ) : historicPhotos.length > 0 ? (
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Historic Photos</Text>
+                <Carousel
+                  ref={carouselRef}
+                  data={historicPhotos}
+                  renderItem={renderHistoricPhoto}
+                  sliderWidth={screenWidth * 0.8}
+                  itemWidth={screenWidth * 0.6}
+                  layout={'default'}
+                  loop={true}
+                  autoplay={true}
+                  autoplayInterval={3000}
+                  removeClippedSubviews={false}
+                  useScrollView={true}
+                />
+                <TouchableOpacity onPress={() => handleSeeMore(landmarks[0]?.name)} style={styles.seeMoreButton}>
+                  <Text style={styles.seeMoreButtonText}>See More</Text>
+                </TouchableOpacity>
               </View>
-            </View>
-          )}
+            ) : (
+              <Text style={styles.noResultText}>No historic photos found 😔</Text>
+            )}
 
-          <View style={styles.feedbackContainer}>
-            <Text style={styles.feedbackQuestion}>Was this information helpful?</Text>
-            <View style={styles.feedbackButtons}>
-              <TouchableOpacity onPress={() => handleFeedback(true)} style={[styles.feedbackButton, feedback === true && styles.selectedFeedback]}>
-                <Ionicons name="thumbs-up" size={24} color={feedback === true ? "white" : "black"} />
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => handleFeedback(false)} style={[styles.feedbackButton, feedback === false && styles.selectedFeedback]}>
-                <Ionicons name="thumbs-down" size={24} color={feedback === false ? "white" : "black"} />
-              </TouchableOpacity>
+            {webEntities.length > 0 && (
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Related Entities</Text>
+                <View style={styles.entitiesContainer}>
+                  {webEntities.map((entity, index) => (
+                      <TouchableOpacity key={index} style={styles.entityItem}>
+                        <Text style={styles.entityText}>{entity.description}</Text>
+                      </TouchableOpacity>
+                    ))}
+                </View>
+              </View>
+            )}
+
+            <View style={styles.feedbackContainer}>
+              <Text style={styles.feedbackQuestion}>Was this information helpful?</Text>
+              <View style={styles.feedbackButtons}>
+                <TouchableOpacity onPress={() => handleFeedback(true)} style={[styles.feedbackButton, feedback === true && styles.selectedFeedback]}>
+                  <Ionicons name="thumbs-up" size={24} color={feedback === true ? "white" : "black"} />
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => handleFeedback(false)} style={[styles.feedbackButton, feedback === false && styles.selectedFeedback]}>
+                  <Ionicons name="thumbs-down" size={24} color={feedback === false ? "white" : "black"} />
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
-        </View>
-      )}
-    </ScrollView>
+        )}
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
@@ -242,7 +246,7 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
   header: {
-    height: screenHeight * 0.3,
+    height: screenHeight * 0.7,
     justifyContent: 'flex-end',
   },
   headerContent: {
@@ -395,136 +399,3 @@ const styles = StyleSheet.create({
     marginTop: 50,
   },
 });
-
-
-// const styles = StyleSheet.create({
-//   container: {
-//     flex: 1,
-//     backgroundColor: '#f5f5f5',
-//   },
-//   userPhoto: {
-//     width: '100%',
-//     height: 250,
-//     resizeMode: 'cover',
-//   },
-//   resultContainer: {
-//     padding: 20,
-//   },
-//   section: {
-//     marginBottom: 25,
-//     backgroundColor: 'white',
-//     borderRadius: 10,
-//     padding: 15,
-//     shadowColor: "#000",
-//     shadowOffset: {
-//       width: 0,
-//       height: 2,
-//     },
-//     shadowOpacity: 0.23,
-//     shadowRadius: 2.62,
-//     elevation: 4,
-//   },
-//   sectionTitle: {
-//     fontSize: 20,
-//     fontWeight: 'bold',
-//     marginBottom: 10,
-//     color: '#333',
-//   },
-//   landmarkItem: {
-//     backgroundColor: '#f9f9f9',
-//     borderRadius: 8,
-//     padding: 12,
-//   },
-//   landmarkName: {
-//     fontSize: 18,
-//     fontWeight: 'bold',
-//     color: '#333',
-//   },
-//   landmarkCountry: {
-//     fontSize: 16,
-//     color: '#666',
-//     marginTop: 4,
-//   },
-//   confidence: {
-//     fontSize: 14,
-//     color: '#888',
-//     marginTop: 4,
-//   },
-//   carouselItem: {
-//     backgroundColor: '#fff',
-//     borderRadius: 8,
-//     overflow: 'hidden',
-//   },
-//   carouselImage: {
-//     width: '100%',
-//     height: 200,
-//     resizeMode: 'cover',
-//   },
-//   carouselTextContainer: {
-//     padding: 10,
-//     backgroundColor: 'rgba(0, 0, 0, 0.5)',
-//   },
-//   carouselTitle: {
-//     fontSize: 14,
-//     fontWeight: 'bold',
-//     color: 'white',
-//   },
-//   seeMoreButton: {
-//     marginTop: 10,
-//     padding: 10,
-//     backgroundColor: '#007AFF',
-//     borderRadius: 5,
-//     alignItems: 'center',
-//   },
-//   seeMoreButtonText: {
-//     color: 'white',
-//     fontSize: 16,
-//   },
-//   entitiesContainer: {
-//     flexDirection: 'row',
-//     flexWrap: 'wrap',
-//   },
-//   entityItem: {
-//     fontSize: 14,
-//     color: '#007AFF',
-//     backgroundColor: '#E1F5FE',
-//     paddingHorizontal: 10,
-//     paddingVertical: 5,
-//     borderRadius: 15,
-//     marginRight: 8,
-//     marginBottom: 8,
-//   },
-//   feedbackContainer: {
-//     alignItems: 'center',
-//     marginTop: 20,
-//   },
-//   feedbackQuestion: {
-//     fontSize: 16,
-//     marginBottom: 10,
-//     color: '#333',
-//   },
-//   feedbackButtons: {
-//     flexDirection: 'row',
-//     justifyContent: 'center',
-//   },
-//   feedbackButton: {
-//     backgroundColor: '#f0f0f0',
-//     padding: 10,
-//     borderRadius: 20,
-//     marginHorizontal: 10,
-//   },
-//   selectedFeedback: {
-//     backgroundColor: '#007AFF',
-//   },
-//   errorText: {
-//     color: 'red',
-//     fontSize: 16,
-//     textAlign: 'center',
-//     marginTop: 20,
-//   },
-//   noResultText: {
-//     fontSize: 16,
-//     textAlign: 'center',
-//     color: '#666',
-//   },
-// });
