@@ -31,12 +31,6 @@ function ResultsScreen({ route }) {
     geminiResult: null,
   });
 
-  // const [historicPhotos, setHistoricPhotos] = useState([]);
-  // const [landmarks, setLandmarks] = useState([]);
-  // const [webEntities, setWebEntities] = useState([]);
-  // const [historicPhotosLoading, setHistoricPhotosLoading] = useState(true);
-  // const [historicPhotosError, setHistoricPhotosError] = useState(null);
-
   const handleFeedback = (isPositive) => {
     setFeedback(isPositive);
     // Here you would typically send this feedback to your backend
@@ -44,8 +38,8 @@ function ResultsScreen({ route }) {
     // TODO: Save user feedback to local storage. (NOTE: add user interaction timestamps too.)
   };
 
-  const handleSeeMore = (landmarkName) => {
-    const query = `${landmarkName} historic photo`;
+  const handleSeeMore = (landmarkName, suffix = 'historic photo') => {
+    const query = `${landmarkName} ${suffix}`;
     const url = `https://www.google.com/search?tbm=isch&q=${encodeURIComponent(query)}`;
     Linking.openURL(url);
   };
@@ -295,7 +289,11 @@ function ResultsScreen({ route }) {
                 <Text style={styles.sectionTitle}>Landmark Detected</Text>
                 <View style={styles.landmarkItem}>
                   <Text style={styles.landmarkName}>{analysisResult.landmarks[0].name}</Text>
-                  <Text style={styles.landmarkCountry}>{analysisResult.landmarks[0].country} ({analysisResult.landmarks[0].position?.lat}, {analysisResult.landmarks[0].position?.long})</Text>
+                  {analysisResult.landmarks.length === 0 && analysisResult.landmarks[0].webEntityMatch ? (
+                    <Text style={styles.webEntityMatch}>Web entity match</Text>
+                  ) : (
+                    <Text style={styles.landmarkCountry}>{analysisResult.landmarks[0].country} ({analysisResult.landmarks[0].position?.lat}, {analysisResult.landmarks[0].position?.long})</Text>
+                  )}
                   <View style={styles.confidenceBar}>
                     <View style={[styles.confidenceFill, { width: `${handleConfidenceValue(analysisResult.landmarks[0].confidence)}%` }]} />
                   </View>
@@ -346,7 +344,7 @@ function ResultsScreen({ route }) {
                 <Text style={styles.sectionTitle}>Related Entities</Text>
                 <View style={styles.entitiesContainer}>
                   {analysisResult.webEntities.map((entity, index) => (
-                      <TouchableOpacity key={index} style={styles.entityItem}>
+                      <TouchableOpacity key={index} style={styles.entityItem} onPress={() => handleSeeMore(entity.name, '')}>
                         <Text style={styles.entityText}>{entity.name}</Text>
 
                       </TouchableOpacity>
