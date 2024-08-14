@@ -163,6 +163,19 @@ function ResultsScreen({ route }) {
       if (mergedResults.length > 0) {
         const primaryResult = mergedResults[0];
         console.log('[performFullAnalysis] Primary result:', primaryResult.name);
+        
+        // check if landmarks exists and if primaryResult actually makes sense
+        if (landmarks.length === 0) {
+          console.log('No landmark detected!');
+          if (primaryResult.confidence < 0.8) {
+            // throw new Error(`Primary result (${primaryResult.name}) is not confident enough to perform analysis`);
+            console.log(`Primary result (${primaryResult.name}) is not confident enough to perform analysis`);
+            return false;
+            // throw new Error(`Primary result (${primaryResult.name}) is not confident enough to perform analysis`);
+          } else {
+            console.log('Primary result is confident enough to perform analysis');
+          }
+        }
   
         const [geminiInfo, updatedHistoricPhotos] = await Promise.all([
           ApiService.getGeminiInfo(primaryResult.name).catch(error => {
@@ -184,7 +197,7 @@ function ResultsScreen({ route }) {
       console.log('[performFullAnalysis] Analysis completed successfully');
       return { 
         landmarks: mergedResults, 
-        webEntities: webEntities.slice(0, 3),  // Keep original top 3 web entities
+        webEntities: webEntities.slice(0, 4),  // Keep original top 3 web entities
         historicPhotos, 
         geminiResult 
       };
@@ -229,6 +242,13 @@ function ResultsScreen({ route }) {
   };
 
   const updateAnalysisInBackground = async (uri, hash) => {
+    // if cachedResult contains empty fields then return otherwise do not update
+    const cachedResult = await CachingService.getItem(`@ImageAnalysis_${hash}`);
+    if (cachedResult.geminiResult || cachedResult.landmarks || cachedResult.webEntities || cachedResult.historicPhotos) {
+      console.log('All data present in cache. Skipping update analysis in background');
+      return;
+    }
+
     try {
       const updatedResult = await performFullAnalysis(uri);
       await CachingService.setItem(`@ImageAnalysis_${hash}`, updatedResult);
@@ -270,7 +290,7 @@ function ResultsScreen({ route }) {
           <Text style={styles.errorText}>{error}</Text>
         ) : (
           <View style={styles.resultContainer}>
-            {analysisResult.landmarks.length > 0 && (
+            {analysisResult.landmarks && analysisResult.landmarks.length > 0 && (
               <View style={styles.section}>
                 <Text style={styles.sectionTitle}>Landmark Detected</Text>
                 <View style={styles.landmarkItem}>
@@ -284,7 +304,7 @@ function ResultsScreen({ route }) {
               </View>
             )}
 
-            {analysisResult.historicPhotos.length > 0 ? (
+            {analysisResult.historicPhotos && analysisResult.historicPhotos.length > 0 ? (
               <View style={styles.section}>
                 <Text style={styles.sectionTitle}>Historic Photos</Text>
                 <Carousel
@@ -321,7 +341,7 @@ function ResultsScreen({ route }) {
               </View>
             )}
 
-            {analysisResult.webEntities.length > 0 ? (
+            {analysisResult.webEntities && analysisResult.webEntities.length > 0 ? (
               <View style={styles.section}>
                 <Text style={styles.sectionTitle}>Related Entities</Text>
                 <View style={styles.entitiesContainer}>
@@ -373,6 +393,7 @@ const styles = StyleSheet.create({
   },
   headerContent: {
     padding: 20,
+    opacity: 0.8,
     paddingTop: 40,
   },
   headerTitle: {
