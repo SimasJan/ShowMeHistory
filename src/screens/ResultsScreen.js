@@ -296,6 +296,15 @@ function ResultsScreen({ route }) {
               <Text style={styles.noResultText}>No historic photos found 😔</Text>
             )}
 
+            {analysisResult.geminiResult.length > 0  ? (
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>About</Text>
+                <Text style={styles.geminiInfo}>{analysisResult.geminiResult}</Text>
+              </View>
+            ) : (
+              <Text style={styles.noResultText}>No about information found 😔</Text>
+            )}
+
             {analysisResult.webEntities.length > 0 ? (
               <View style={styles.section}>
                 <Text style={styles.sectionTitle}>Related Entities</Text>
@@ -310,13 +319,6 @@ function ResultsScreen({ route }) {
               </View>
             ) : (
               <Text style={styles.noResultText}>No related entities found 😔</Text>
-            )}
-
-            {analysisResult.geminiResult && (
-              <View style={styles.section}>
-                <Text style={styles.sectionTitle}>About</Text>
-                <Text style={styles.entityText}>{analysisResult.geminiResult}</Text>
-              </View>
             )}
 
             <View style={styles.feedbackContainer}>

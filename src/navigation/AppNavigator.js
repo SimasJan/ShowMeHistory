@@ -7,19 +7,11 @@ const Stack = createStackNavigator();
 
 function AppNavigator() {
   return (
-<<<<<<< HEAD
-      <Stack.Navigator initialRouteName="Home">
-        <Stack.Screen name="Home" component={HomeScreen} options={{ headerShown: false }}/>
-        <Stack.Screen name="Camera" component={CameraScreen} options={{ headerShown: false }}/>
-        <Stack.Screen name="Results" component={ResultsScreen} options={{ headerShown: false }}/>
-      </Stack.Navigator>
-=======
     <Stack.Navigator initialRouteName="Home">
       <Stack.Screen name="Home" component={HomeScreen} options={{ headerShown: false }}/>
       <Stack.Screen name="Camera" component={CameraScreen} options={{ headerShown: false }}/>
       <Stack.Screen name="Results" component={ResultsScreen} options={{ headerShown: false }}/>
     </Stack.Navigator>
->>>>>>> gemini-branch
   );
 }
 
