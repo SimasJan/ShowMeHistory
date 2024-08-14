@@ -2,9 +2,25 @@ import axios from 'axios';
 // import { googleVisionApiKey, searchEngineID, geminiApiKey } from '../../creds/apiKeys';
 import { handleErrorMessage, cleanTitle, generatePrompt } from '../utils/utils';
 import { Configuration } from '../../config/config';
+import * as FileSystem from 'expo-file-system';
 
 export const ApiService = {
-    objectDetection: async (base64Image) => {
+    objectDetection: async (uri) => {
+
+        // Attempt to read the file
+        let base64Image;
+        try {
+            base64Image = await FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.Base64 });
+            console.log('[performFullAnalysis] Successfully read image file. Length:', base64Image.length);
+        } catch (readError) {
+            console.error('[performFullAnalysis] Error reading file:', readError);
+            throw new Error(`Failed to read image file: ${readError.message}`);
+        }
+
+        // Check if base64Image is valid
+        if (!base64Image || base64Image.length === 0) {
+            throw new Error('Read file is empty or invalid');
+        }
 
         const apiUrl = `${Configuration.Urls.googleVision}?key=${Configuration.ApiKeys.googleVisionApiKey}`;
         const requestData = {
@@ -78,4 +94,25 @@ export const ApiService = {
             throw error;
         }
     },
+    searchLandmarkEvents: async (landmarkName) => {
+        console.log('Searching landmark events for:', landmarkName);
+        try {
+            const response = await axios.get(Configuration.Urls.searchHistoricPhotos, {
+            params: {
+                key: Configuration.ApiKeys.googleVisionApiKey,
+                cx: Configuration.ApiKeys.searchEngineID,
+                q: `${landmarkName} events`,
+                searchType: Configuration.SearchHistoricPhotosParams.searchType,
+                num: Configuration.SearchHistoricPhotosParams.maxResults,
+                imgType: Configuration.SearchHistoricPhotosParams.imgType,
+                // rights: Configuration.SearchLandmarkEventsParams.rights,
+            },
+            });
+            console.log('searchLandmarkEvents results found: ', response.data.items);
+            return response.data.items;
+        } catch (error) {
+            console.error('Error searching for landmark events:', handleErrorMessage(error));
+            throw error;
+        }
+    }
   };

@@ -24,11 +24,13 @@ function ResultsScreen({ route }) {
   const [error, setError] = useState(null);
   const [feedback, setFeedback] = useState(null);
   const carouselRef = useRef(null);
+  const eventsCarouselRef = useRef(null);
   const [analysisResult, setAnalysisResult] = useState({
     landmarks: [],
     webEntities: [],
     historicPhotos: [],
     geminiResult: null,
+    landmarkEvents: [],
   });
 
   const handleFeedback = (isPositive) => {
@@ -49,6 +51,18 @@ function ResultsScreen({ route }) {
     return (
       <TouchableOpacity onPress={() => Linking.openURL(item.url)} style={styles.carouselItem}>
         <Image source={{ uri: item.thumbnail }} style={styles.carouselImage} />
+        <BlurView intensity={6} style={styles.carouselTextContainer}>
+          <Text style={styles.carouselTitle}>{item.title.replace('File:', '') || 'No title'}</Text>
+        </BlurView>
+      </TouchableOpacity>
+    );
+  };
+
+  const renderEventImage = ({ item }) => {
+    if (!item || !item.image) return null;
+    return (
+      <TouchableOpacity onPress={() => Linking.openURL(item.displayLink)} style={styles.carouselItem}>
+        <Image source={{ uri: item.image.thumbnailLink }} style={styles.carouselImage} />
         <BlurView intensity={6} style={styles.carouselTextContainer}>
           <Text style={styles.carouselTitle}>{item.title.replace('File:', '') || 'No title'}</Text>
         </BlurView>
@@ -103,25 +117,11 @@ function ResultsScreen({ route }) {
         throw new Error(`Invalid URI provided: ${uri}`);
       }
   
-      // Attempt to read the file
-      let base64Image;
-      try {
-        base64Image = await FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.Base64 });
-        console.log('[performFullAnalysis] Successfully read image file. Length:', base64Image.length);
-      } catch (readError) {
-        console.error('[performFullAnalysis] Error reading file:', readError);
-        throw new Error(`Failed to read image file: ${readError.message}`);
-      }
-  
-      // Check if base64Image is valid
-      if (!base64Image || base64Image.length === 0) {
-        throw new Error('Read file is empty or invalid');
-      }
-  
+
       // Perform initial API calls concurrently
       console.log('[performFullAnalysis] Initiating API calls');
       const [visionResult, initialHistoricPhotos] = await Promise.all([
-        ApiService.objectDetection(base64Image),
+        ApiService.objectDetection(uri),
         ApiService.searchHistoricPhotos(''),  // Initial search without landmark name
       ]);
       console.log('[performFullAnalysis] API calls completed');
@@ -152,6 +152,7 @@ function ResultsScreen({ route }) {
   
       let geminiResult = null;
       let historicPhotos = initialHistoricPhotos;
+      let eventsResult = [];
   
       // If we have any results, get additional information
       if (mergedResults.length > 0) {
@@ -171,7 +172,7 @@ function ResultsScreen({ route }) {
           }
         }
   
-        const [geminiInfo, updatedHistoricPhotos] = await Promise.all([
+        const [geminiInfo, updatedHistoricPhotos, landmarkEvents] = await Promise.all([
           ApiService.getGeminiInfo(primaryResult.name).catch(error => {
             console.error('Error fetching Gemini info:', error);
             return null;
@@ -180,10 +181,15 @@ function ResultsScreen({ route }) {
             console.error('Error fetching updated historic photos:', error);
             return initialHistoricPhotos;  // Fallback to initial results
           }),
+          ApiService.searchLandmarkEvents(primaryResult.name).catch(error => {
+            console.error('Error fetching landmark events:', error);
+            return null;
+          }),
         ]);
   
         geminiResult = geminiInfo;
         historicPhotos = updatedHistoricPhotos;
+        eventsResult = landmarkEvents;
       } else {
         console.log('[performFullAnalysis] No landmarks or web entities detected');
       }
@@ -192,8 +198,9 @@ function ResultsScreen({ route }) {
       return { 
         landmarks: mergedResults, 
         webEntities: webEntities.slice(0, 4),  // Keep original top 3 web entities
-        historicPhotos, 
-        geminiResult 
+        historicPhotos: historicPhotos, 
+        geminiResult: geminiResult,
+        landmarkEvents: eventsResult
       };
     } catch (error) {
       console.error('[performFullAnalysis] Error:', error);
@@ -211,6 +218,7 @@ function ResultsScreen({ route }) {
           entity.name.toLowerCase().includes(landmark.name.toLowerCase())
         } catch (error) {
           console.error('Error comparing landmarks:', error);
+          return false;
         }
       });
 
@@ -220,8 +228,8 @@ function ResultsScreen({ route }) {
       } else {
         results.push({
           name: entity.name,
-          country: 'Unknown',
-          position: 'Position not available',
+          country: null,
+          position: null,
           confidence: entity.confidence,
           source: 'webEntity',
         });
@@ -238,7 +246,9 @@ function ResultsScreen({ route }) {
   const updateAnalysisInBackground = async (uri, hash) => {
     // if cachedResult contains empty fields then return otherwise do not update
     const cachedResult = await CachingService.getItem(`@ImageAnalysis_${hash}`);
-    if (cachedResult.geminiResult || cachedResult.landmarks || cachedResult.webEntities || cachedResult.historicPhotos) {
+    const missingFields = ['geminiResult', 'landmarks', 'webEntities', 'historicPhotos', 'landmarkEvents'].filter(field => !cachedResult[field]);
+
+    if (missingFields.length === 0) {
       console.log('All data present in cache. Skipping update analysis in background');
       return;
     }
@@ -289,11 +299,15 @@ function ResultsScreen({ route }) {
                 <Text style={styles.sectionTitle}>Landmark Detected</Text>
                 <View style={styles.landmarkItem}>
                   <Text style={styles.landmarkName}>{analysisResult.landmarks[0].name}</Text>
-                  {analysisResult.landmarks.length === 0 && analysisResult.landmarks[0].webEntityMatch ? (
-                    <Text style={styles.webEntityMatch}>Web entity match</Text>
-                  ) : (
+                  {analysisResult.landmarks[0].country && (
                     <Text style={styles.landmarkCountry}>{analysisResult.landmarks[0].country} ({analysisResult.landmarks[0].position?.lat}, {analysisResult.landmarks[0].position?.long})</Text>
                   )}
+                  {/* <Text style={styles.landmarkCountry}>{analysisResult.landmarks[0].country ? analysisResult.landmarks[0].country.name : ''} ({analysisResult.landmarks[0].position?.lat}, {analysisResult.landmarks[0].position?.long})</Text> */}
+                  {/* {analysisResult.landmarks.length === 0 && analysisResult.landmarks[0].webEntityMatch ? (
+                    <Text style={styles.webEntityMatch}>Web entity match</Text>
+                  ) : (
+                    <Text style={styles.landmarkCountry}>{analysisResult.landmarks[0].country.name} ({analysisResult.landmarks[0].position?.lat}, {analysisResult.landmarks[0].position?.long})</Text>
+                  )} */}
                   <View style={styles.confidenceBar}>
                     <View style={[styles.confidenceFill, { width: `${handleConfidenceValue(analysisResult.landmarks[0].confidence)}%` }]} />
                   </View>
@@ -343,17 +357,42 @@ function ResultsScreen({ route }) {
               <View style={styles.section}>
                 <Text style={styles.sectionTitle}>Related Entities</Text>
                 <View style={styles.entitiesContainer}>
-                  {analysisResult.webEntities.map((entity, index) => (
-                      <TouchableOpacity key={index} style={styles.entityItem} onPress={() => handleSeeMore(entity.name, '')}>
-                        <Text style={styles.entityText}>{entity.name}</Text>
-
-                      </TouchableOpacity>
-                    ))}
+                  {analysisResult.webEntities.filter(entity => entity.name && entity.name.length > 1).map((entity, index) => (
+                    <TouchableOpacity key={index} style={styles.entityItem} onPress={() => handleSeeMore(entity.name, '')}>
+                      <Text style={styles.entityText}>{entity.name}</Text>
+                    </TouchableOpacity>
+                  ))}
                 </View>
               </View>
             ) : (
               <View style={styles.section}>
                 <Text style={styles.noResultText}>No related entities found 😔</Text>
+              </View>
+            )}
+
+            {analysisResult.landmarkEvents && analysisResult.landmarkEvents.length > 0 ? (
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Nearby Events</Text>
+                <Carousel
+                  ref={eventsCarouselRef}
+                  data={analysisResult.landmarkEvents}
+                  renderItem={renderEventImage}
+                  sliderWidth={screenWidth * 0.8}
+                  itemWidth={screenWidth * 0.6}
+                  layout={'default'}
+                  loop={true}
+                  autoplay={true}
+                  autoplayInterval={3000}
+                  removeClippedSubviews={false}
+                  useScrollView={true}
+                />
+                <TouchableOpacity onPress={() => handleSeeMore(analysisResult.landmarks[0]?.name, ' events')} style={styles.seeMoreButton}>
+                  <Text style={styles.seeMoreButtonText}>See More</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View style={styles.section}>
+                <Text style={styles.noResultText}>No events found 😔</Text>
               </View>
             )}
 

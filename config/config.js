@@ -19,6 +19,6 @@ export const Configuration = {
         searchType: 'image',
         maxResults: 10,
         imgType: 'photo',
-        rights: 'cc_publicdomain|cc_attribute|cc_sharealike', // TODO: find out more about this!
+        // rights: 'cc_publicdomain|cc_attribute|cc_sharealike', // TODO: find out more about this!
     }
 }
