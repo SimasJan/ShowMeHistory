@@ -10,6 +10,7 @@ import { BlurView } from 'expo-blur';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { generateImageHash } from '../utils/imageHash';
 import { getGeminiInfo } from '../services/geminiService';
+import { updateStateWithCachedResult, updateStateWithResult, updateCachedResult, setCachedResult, getCachedResult } from '../utils/caching';
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
@@ -30,12 +31,12 @@ function ResultsScreen({ route }) {
 
 
   useEffect(() => {
-    console.log('Route params:', route.params);
+    // console.log('Route params:', route.params);
     if (route.params && route.params.photo) {
       setPhoto(route.params.photo);
       processImage(route.params.photo.uri);
     } else {
-      setError('No photo provided');
+      setError('No photo provided!');
       setLoading(false);
     }
   }, [route.params]);
@@ -44,21 +45,24 @@ function ResultsScreen({ route }) {
     try {
       setLoading(true);
       setIsAnalysing(true);
-      const hash = await generateImageHash(uri);
+      const hash = await generateImageHash(uri); // TODO: verify if this is the correct way to generate a hash or imageHash should be used?
       console.log('Generated image hash:', hash);
       setImageHash(hash);
 
       if (hash) {
         const cachedResult = await getCachedResult(hash);
+        console.log('Cached result found:', cachedResult);
+
         if (cachedResult) {
-          console.log('Using cached result');
+          console.log('Using cached result!');
           updateStateWithCachedResult(cachedResult);
           setLoading(false);
           // Update in background
           updateCachedResult(hash, uri);
         } else {
-          console.log('No cached result found, analyzing image');
+          console.log('No cached result found, analyzing image!');
           await analyzeImage(uri);
+          setCachedResult(hash, uri);
         }
       } else {
         console.error('Failed to generate image hash');
@@ -98,7 +102,7 @@ function ResultsScreen({ route }) {
       setLoading(false);
     }
   };
-
+  
   const updateStateWithCachedResult = (cachedResult) => {
     setLandmarks(cachedResult.landmarks || []);
     setWebEntities(cachedResult.webEntities || []);
@@ -107,6 +111,7 @@ function ResultsScreen({ route }) {
   };
 
   const updateStateWithResult = (result) => {
+    console.log('Updating state with result:', result);
     setLandmarks(result.landmarks);
     setWebEntities(result.webEntities);
     setHistoricPhotos(result.historicPhotos);
@@ -120,47 +125,42 @@ function ResultsScreen({ route }) {
   };
 
   const updateCachedResult = async (hash, uri) => {
-    try {
-      const updatedResult = await analyzeImage(uri, false);
-      if (updatedResult) {
-        await setCachedResult(hash, updatedResult);
-        updateStateWithCachedResult(updatedResult);
-      }
-    } catch (error) {
-      console.error('Error updating cached result:', error);
+    console.log('Updating cached result for hash:', hash);
+    // TODO: Do we need to update the cached result? Check if the cached result is missing data and if it is, update it.
+    const cachedResult = await getCachedResult(hash);
+    if (cachedResult) {
+      console.log('Cached result found, checking if any information is missing!\n', cachedResult);
+      let missingData = false;
+
+      if (cachedResult.landmarks.length > 0) {
+        console.log('Cached result has landmarks, skipping analysis');
+      } else {missingData = true;}
+      if (cachedResult.webEntities.length > 0) {
+        console.log('Cached result has web entities, skipping analysis');
+      } else {missingData = true;}
+      if (cachedResult.historicPhotos.length > 0) {
+        console.log('Cached result has historic photos, skipping analysis');
+      } else {missingData = true;}
+      if (cachedResult.geminiResult) {
+        console.log('Cached result has gemini result, skipping analysis');
+      } else {missingData = true;}
+    } else {
+        console.log('No cached result found!');
+        return;
     }
-  };
-    
-  const setCachedResult = async (hash, data) => {
-    try {
-      const cacheData = {
-        ...data,
-        timestamp: Date.now(),
-      };
-      console.log('Caching data for hash:', hash);
-      await AsyncStorage.setItem(`@ImageAnalysis_${hash}`, JSON.stringify(cacheData));
-    } catch (error) {
-      console.error('Error caching data:', error);
-    }
-  };
-  
-  const getCachedResult = async (hash) => {
-    try {
-      const cachedData = await AsyncStorage.getItem(`@ImageAnalysis_${hash}`);
-      if (cachedData) {
-        const parsedData = JSON.parse(cachedData);
-        console.log('Found cached data for hash:', hash);
-        // Check if the cached data is not older than 24 hours
-        if (Date.now() - parsedData.timestamp < 24 * 60 * 60 * 1000) {
-          return parsedData;
-        } else {
-          console.log('Cached data is older than 24 hours, will reanalyze');
+    if (missingData) {
+      console.log('Updating cached result with new analysis');
+      try {
+        const updatedResult = await analyzeImage(uri, false);
+        if (updatedResult) {
+          await setCachedResult(hash, updatedResult);
+          updateStateWithCachedResult(updatedResult);
         }
+      } catch (error) {
+        console.error('Error updating cached result:', error);
       }
-      return null;
-    } catch (error) {
-      console.error('Error reading cached data:', error);
-      return null;
+    } else {
+      console.log('Cached result is already up to date, skipping update');
     }
   };
 
@@ -245,6 +245,7 @@ function ResultsScreen({ route }) {
   };
 
   const fetchHistoricPhotos = async (landmarkName) => {
+    console.log('Fetching historic photos for landmark: ', landmarkName);
     setHistoricPhotosLoading(true);
     try {
       const photos = await searchHistoricPhotos(landmarkName);
@@ -254,9 +255,6 @@ function ResultsScreen({ route }) {
       console.error('Error fetching historic photos:', error);
       setHistoricPhotosError(error);
     }
-    // } finally {
-    //   setHistoricPhotosLoading(false);
-    // }
   };
 
   const handleFeedback = (isPositive) => {
@@ -281,6 +279,42 @@ function ResultsScreen({ route }) {
         </BlurView>
       </TouchableOpacity>
     );
+  };
+
+  const setCachedResult = async (hash, data) => {
+    console.log('Setting cached result for hash:', hash);
+    try {
+      const cacheData = {
+        ...data,
+        timestamp: Date.now(),
+      };
+      // console.log('Caching data for hash:', hash);
+      await AsyncStorage.setItem(`@ImageAnalysis_${hash}`, JSON.stringify(cacheData));
+    } catch (error) {
+      console.error('Error caching data:', error);
+    }
+  };
+  
+  const getCachedResult = async (hash) => {
+    console.log('Getting cached result for hash:', hash);
+    try {
+      const cachedData = await AsyncStorage.getItem(`@ImageAnalysis_${hash}`);
+      if (cachedData) {
+        const parsedData = JSON.parse(cachedData);
+        console.log('Found cached data for hash:', hash);
+        return parsedData;
+        // Check if the cached data is not older than 24 hours
+        // if (Date.now() - parsedData.timestamp < 24 * 60 * 60 * 1000) {
+        //   return parsedData;
+        // } else {
+        //   console.log('Cached data is older than 24 hours, will reanalyze');
+        // }
+      }
+      return null;
+    } catch (error) {
+      console.error('Error reading cached data:', error);
+      return null;
+    }
   };
 
 
@@ -360,7 +394,7 @@ function ResultsScreen({ route }) {
             </View>
           ) : (
             <View style={styles.section}>
-              <Text style={styles.noResultText}>No 'About' information found 😔</Text>
+              <Text style={styles.noResultText}>No information found 😔</Text>
             </View>
           )}
 
@@ -378,7 +412,7 @@ function ResultsScreen({ route }) {
           ) : 
           (
             <View style={styles.section}>
-              <Text style={styles.noResultText}>No 'Related Entities' found 😔</Text>
+              <Text style={styles.noResultText}>No related entities found 😔</Text>
             </View>
           )}
 
@@ -410,7 +444,7 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
   header: {
-    height: screenHeight * 0.3,
+    height: screenHeight * 0.75,
     justifyContent: 'flex-end',
   },
   headerContent: {

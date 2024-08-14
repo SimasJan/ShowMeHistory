@@ -33,7 +33,7 @@ function HomeScreen({ navigation }) {
     // <View style={styles.container}>
       <ImageBackground source={require('../../assets/home-background.jpg')} style={styles.container}>
       <View style={styles.header}>
-        <Text style={{ fontSize: 30, fontWeight: 'bold', color: 'white'}}>🏯 Show Me History 📜</Text>
+        <Text style={{ fontSize: 30, fontWeight: 'bold', color: 'white'}}>🏯 Show Me History</Text>
         <Text style={{ fontSize: 14, padding: 5, color: 'white'}}>Find historic photos of landmarks in front of you!</Text>
         {/* <Text style={{ fontSize: 15, padding: 5, marginTop: 20, color: 'black'}}>Start by taking a picture of a landmark 😎</Text> */}
       </View>
@@ -85,8 +85,10 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 2,
     padding: 30,
-    margin: 30,
+    margin: 20
+    ,
     alignItems: 'center',
+    opacity: 0.8
   },
   buttonText: {
     fontSize: 16,
