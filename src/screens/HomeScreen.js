@@ -77,7 +77,8 @@ const styles = StyleSheet.create({
   buttonContainer: {
     width: '75%',
     flexDirection: 'column',
-    margin: 20,
+    margin: 10,
+    opacity: 0.8
   },
   button: {
     backgroundColor: 'white',
