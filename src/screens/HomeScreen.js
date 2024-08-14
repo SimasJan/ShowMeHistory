@@ -16,8 +16,6 @@ function HomeScreen({ navigation }) {
             quality: 1,
         });
 
-        // console.log('[HomeScreen] picked image: ', result);
-
         if (!result.canceled && result.assets && result.assets.length > 0) {
           // console.log('Navigating to Results with: ', { photo: { uri: result.assets[0].uri }});
           navigation.navigate('Results', { photo: { uri: result.assets[0].uri } });
@@ -31,8 +29,8 @@ function HomeScreen({ navigation }) {
     }
   };
 
-  return (    
-    <SafeAreaView style={styles.mainContainer}>
+  return (
+    <SafeAreaView style={{ flex: 1}}>
       <ImageBackground source={require('../../assets/home-background.jpg')} style={styles.container}>
       <View style={styles.header}>
         <Text style={{ fontSize: 30, fontWeight: 'bold', color: 'white'}}>🏯 Show Me History</Text>
@@ -84,7 +82,8 @@ const styles = StyleSheet.create({
   buttonContainer: {
     width: '75%',
     flexDirection: 'column',
-    margin: 20,
+    margin: 10,
+    opacity: 0.8
   },
   button: {
     backgroundColor: 'white',

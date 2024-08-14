@@ -1,12 +1,16 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { View, Text, Image, StyleSheet, ScrollView, ActivityIndicator, TouchableOpacity, Dimensions, Linking, ImageBackground } from 'react-native';
 import axios from 'axios';
 import * as FileSystem from 'expo-file-system';
-import { googleVisionApiKey } from '../../creds/apiKey';
+import { googleVisionApiKey } from '../../creds/apiKeys';
 import { Ionicons } from '@expo/vector-icons';
 import { searchHistoricPhotos } from '../services/historicPhotoService';
 import Carousel from 'react-native-snap-carousel';
 import { BlurView } from 'expo-blur';
+import { SafeAreaView } from 'react-native-safe-area-context';
+// custom
+import { ApiService } from '../services/apiServices';
+import { CachingService } from '../services/caching';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { generateImageHash } from '../utils/imageHash';
 import { getGeminiInfo } from '../services/geminiService';
@@ -16,251 +20,28 @@ const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
 function ResultsScreen({ route }) {
   const [photo, setPhoto] = useState(null);
-  const [landmarks, setLandmarks] = useState([]);
-  const [webEntities, setWebEntities] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [feedback, setFeedback] = useState(null);
-  const [historicPhotos, setHistoricPhotos] = useState([]);
-  const [historicPhotosLoading, setHistoricPhotosLoading] = useState(true);
-  const [historicPhotosError, setHistoricPhotosError] = useState(null);
   const carouselRef = useRef(null);
-  const [imageHash, setImageHash] = useState(null);
-  const [geminiResult, setGeminiResult] = useState(null);
-  const [isAnalysing, setIsAnalysing] = useState(false);
+  const [analysisResult, setAnalysisResult] = useState({
+    landmarks: [],
+    webEntities: [],
+    historicPhotos: [],
+    geminiResult: null,
+  });
 
-
-  useEffect(() => {
-    // console.log('Route params:', route.params);
-    if (route.params && route.params.photo) {
-      setPhoto(route.params.photo);
-      processImage(route.params.photo.uri);
-    } else {
-      setError('No photo provided!');
-      setLoading(false);
-    }
-  }, [route.params]);
-  
-  const processImage = async (uri) => {
-    try {
-      setLoading(true);
-      setIsAnalysing(true);
-      const hash = await generateImageHash(uri); // TODO: verify if this is the correct way to generate a hash or imageHash should be used?
-      console.log('Generated image hash:', hash);
-      setImageHash(hash);
-
-      if (hash) {
-        const cachedResult = await getCachedResult(hash);
-        console.log('Cached result found:', cachedResult);
-
-        if (cachedResult) {
-          console.log('Using cached result!');
-          updateStateWithCachedResult(cachedResult);
-          setLoading(false);
-          // Update in background
-          updateCachedResult(hash, uri);
-        } else {
-          console.log('No cached result found, analyzing image!');
-          await analyzeImage(uri);
-          setCachedResult(hash, uri);
-        }
-      } else {
-        console.error('Failed to generate image hash');
-        throw new Error('Failed to generate image hash');
-      }
-    } catch (error) {
-      console.error('Error processing image:', error);
-      setError('Error processing image. Please try again.');
-    } finally {
-      setLoading(false);
-      setIsAnalysing(false);
-    }
-  };
-
-  const hashImage = async (uri) => {
-    try {
-      const hash = await generateImageHash(uri);
-      setImageHash(hash);
-      if (hash) {
-        const cachedResult = await getCachedResult(hash);
-        if (cachedResult) {
-          // Use cached result
-          setLandmarks(cachedResult.landmarks);
-          setWebEntities(cachedResult.webEntities);
-          setHistoricPhotos(cachedResult.historicPhotos);
-          setLoading(false);
-        } else {
-          // Proceed with analysis
-          analyzeImage(uri);
-        }
-      } else {
-        throw new Error('Failed to generate image hash');
-      }
-    } catch (error) {
-      console.error('Error in hashImage:', error);
-      setError('Error processing image. Please try again.');
-      setLoading(false);
-    }
-  };
-  
-  const updateStateWithCachedResult = (cachedResult) => {
-    setLandmarks(cachedResult.landmarks || []);
-    setWebEntities(cachedResult.webEntities || []);
-    setHistoricPhotos(cachedResult.historicPhotos || []);
-    setGeminiResult(cachedResult.geminiResult);
-  };
-
-  const updateStateWithResult = (result) => {
-    console.log('Updating state with result:', result);
-    setLandmarks(result.landmarks);
-    setWebEntities(result.webEntities);
-    setHistoricPhotos(result.historicPhotos);
-    setGeminiResult(result.geminiResult);
-
-    if (!result.landmarks.length && !result.webEntities.length) {
-      setError('No information detected in the image.');
-    } else {
-      setError(null);
-    }
-  };
-
-  const updateCachedResult = async (hash, uri) => {
-    console.log('Updating cached result for hash:', hash);
-    // TODO: Do we need to update the cached result? Check if the cached result is missing data and if it is, update it.
-    const cachedResult = await getCachedResult(hash);
-    if (cachedResult) {
-      console.log('Cached result found, checking if any information is missing!\n', cachedResult);
-      let missingData = false;
-
-      if (cachedResult.landmarks.length > 0) {
-        console.log('Cached result has landmarks, skipping analysis');
-      } else {missingData = true;}
-      if (cachedResult.webEntities.length > 0) {
-        console.log('Cached result has web entities, skipping analysis');
-      } else {missingData = true;}
-      if (cachedResult.historicPhotos.length > 0) {
-        console.log('Cached result has historic photos, skipping analysis');
-      } else {missingData = true;}
-      if (cachedResult.geminiResult) {
-        console.log('Cached result has gemini result, skipping analysis');
-      } else {missingData = true;}
-    } else {
-        console.log('No cached result found!');
-        return;
-    }
-    if (missingData) {
-      console.log('Updating cached result with new analysis');
-      try {
-        const updatedResult = await analyzeImage(uri, false);
-        if (updatedResult) {
-          await setCachedResult(hash, updatedResult);
-          updateStateWithCachedResult(updatedResult);
-        }
-      } catch (error) {
-        console.error('Error updating cached result:', error);
-      }
-    } else {
-      console.log('Cached result is already up to date, skipping update');
-    }
-  };
-
-  const analyzeImage = async (uri, updateState = true) => {
-    try {
-      const apiUrl = `https://vision.googleapis.com/v1/images:annotate?key=${googleVisionApiKey}`;
-  
-      const base64Image = await FileSystem.readAsStringAsync(uri, { 
-        encoding: FileSystem.EncodingType.Base64
-      });
-  
-      const requestData = {
-        requests: [
-          {
-            image: { content: base64Image },
-            features: [
-              { type: 'LANDMARK_DETECTION', maxResults: 3 },
-              { type: 'WEB_DETECTION', maxResults: 3 }
-            ]
-          }
-        ],
-      };
-  
-      const apiResponse = await axios.post(apiUrl, requestData, {
-        headers: {
-          'Content-Type': 'application/json; charset=utf-8',
-        }
-      });
-      console.log('API Response received');
-  
-      const { landmarkAnnotations, webDetection } = apiResponse.data.responses[0];
-  
-      let result = {
-        landmarks: [],
-        webEntities: [],
-        historicPhotos: [],
-        geminiResult: null
-      };
-  
-      if (landmarkAnnotations && landmarkAnnotations.length > 0) {
-        result.landmarks = landmarkAnnotations.map(landmark => ({
-          name: landmark.description,
-          country: landmark.locations[0].latLng.latitude > 0 ? 'Northern Hemisphere' : 'Southern Hemisphere',
-          position: `${landmark.locations[0].latLng.latitude?.toFixed(2)}, ${landmark.locations[0].latLng.longitude?.toFixed(2)}`,
-          confidence: landmark.score
-        }));
-        console.log('Detected landmarks:', result.landmarks);
-  
-        // Fetch Gemini AI information
-        try {
-          result.geminiResult = await getGeminiInfo(result.landmarks[0].name);
-        } catch (geminiError) {
-          console.error('Error fetching Gemini information:', geminiError.message);
-          result.geminiResult = null;
-        }
-  
-        // Fetch historic photos
-        try {
-          result.historicPhotos = await fetchHistoricPhotos(result.landmarks[0].name) || [];
-        } catch (historicPhotoError) {
-          console.error('Error fetching historic photos:', historicPhotoError);
-          result.historicPhotos = [];
-        }
-      }
-  
-      if (webDetection && webDetection.webEntities && webDetection.webEntities.length > 0) {
-        result.webEntities = webDetection.webEntities.slice(0, 3);
-      }
-  
-      if (updateState) {
-        updateStateWithResult(result);
-      }
-
-      return result;     
-    } catch (error) {
-      console.error('Error analyzing image: ', error);
-      if (updateState) {
-        setError('Error analyzing image. Please try again.');
-      }
-      return null;
-    }
-  };
-
-  const fetchHistoricPhotos = async (landmarkName) => {
-    console.log('Fetching historic photos for landmark: ', landmarkName);
-    setHistoricPhotosLoading(true);
-    try {
-      const photos = await searchHistoricPhotos(landmarkName);
-      console.log('Historic photos fetched:', photos.length);
-      return photos;
-    } catch (error) {
-      console.error('Error fetching historic photos:', error);
-      setHistoricPhotosError(error);
-    }
-  };
+  // const [historicPhotos, setHistoricPhotos] = useState([]);
+  // const [landmarks, setLandmarks] = useState([]);
+  // const [webEntities, setWebEntities] = useState([]);
+  // const [historicPhotosLoading, setHistoricPhotosLoading] = useState(true);
+  // const [historicPhotosError, setHistoricPhotosError] = useState(null);
 
   const handleFeedback = (isPositive) => {
     setFeedback(isPositive);
     // Here you would typically send this feedback to your backend
     console.log(`User feedback: ${isPositive ? 'Positive' : 'Negative'}`);
+    // TODO: Save user feedback to local storage. (NOTE: add user interaction timestamps too.)
   };
 
   const handleSeeMore = (landmarkName) => {
@@ -281,42 +62,177 @@ function ResultsScreen({ route }) {
     );
   };
 
-  const setCachedResult = async (hash, data) => {
-    console.log('Setting cached result for hash:', hash);
-    try {
-      const cacheData = {
-        ...data,
-        timestamp: Date.now(),
-      };
-      // console.log('Caching data for hash:', hash);
-      await AsyncStorage.setItem(`@ImageAnalysis_${hash}`, JSON.stringify(cacheData));
-    } catch (error) {
-      console.error('Error caching data:', error);
+  useEffect(() => {
+    if (route.params && route.params.photo) {
+      setPhoto(route.params.photo);
+      processImage(route.params.photo.uri);
+    } else {
+      setError('No photo provided');
+      setLoading(false);
     }
-  };
+  }, [route.params, processImage]);
+
   
-  const getCachedResult = async (hash) => {
-    console.log('Getting cached result for hash:', hash);
+  const processImage = useCallback(async (uri) => {
     try {
-      const cachedData = await AsyncStorage.getItem(`@ImageAnalysis_${hash}`);
-      if (cachedData) {
-        const parsedData = JSON.parse(cachedData);
-        console.log('Found cached data for hash:', hash);
-        return parsedData;
-        // Check if the cached data is not older than 24 hours
-        // if (Date.now() - parsedData.timestamp < 24 * 60 * 60 * 1000) {
-        //   return parsedData;
-        // } else {
-        //   console.log('Cached data is older than 24 hours, will reanalyze');
-        // }
+      setLoading(true);
+      const hash = await CachingService.generateImageHash(uri);
+      const cachedResult = await CachingService.getItem(`@ImageAnalysis_${hash}`);
+
+      if (cachedResult) {
+        console.log('Cached results found! Using cached analysis result!');
+        setAnalysisResult(cachedResult);
+        setLoading(false);
+        // Update in background
+        console.log('Updating in background cached result!')
+        updateAnalysisInBackground(uri, hash);
+      } else {
+        console.log('No cache found! Performing full analysis...');
+        const result = await performFullAnalysis(uri);
+        setAnalysisResult(result);
+        await CachingService.setItem(`@ImageAnalysis_${hash}`, result);
       }
-      return null;
     } catch (error) {
-      console.error('Error reading cached data:', error);
-      return null;
+      console.error('Error processing image:', error);
+      setError('Error processing image. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const performFullAnalysis = async (uri) => {
+    try {
+      console.log('[performFullAnalysis] Starting analysis for uri:', uri);
+  
+      // Check if the uri is valid
+      if (!uri || typeof uri !== 'string') {
+        throw new Error(`Invalid URI provided: ${uri}`);
+      }
+  
+      // Attempt to read the file
+      let base64Image;
+      try {
+        base64Image = await FileSystem.readAsStringAsync(uri, { encoding: FileSystem.EncodingType.Base64 });
+        console.log('[performFullAnalysis] Successfully read image file. Length:', base64Image.length);
+      } catch (readError) {
+        console.error('[performFullAnalysis] Error reading file:', readError);
+        throw new Error(`Failed to read image file: ${readError.message}`);
+      }
+  
+      // Check if base64Image is valid
+      if (!base64Image || base64Image.length === 0) {
+        throw new Error('Read file is empty or invalid');
+      }
+  
+      // Perform initial API calls concurrently
+      console.log('[performFullAnalysis] Initiating API calls');
+      const [visionResult, initialHistoricPhotos] = await Promise.all([
+        ApiService.objectDetection(base64Image),
+        ApiService.searchHistoricPhotos(''),  // Initial search without landmark name
+      ]);
+      console.log('[performFullAnalysis] API calls completed');
+  
+      // Process landmarks
+      const landmarks = visionResult.landmarkAnnotations?.map(landmark => ({
+        name: landmark.description,
+        country: landmark.locations?.[0]?.latLng?.latitude > 0 ? 'Northern Hemisphere' : 'Southern Hemisphere',
+        position: landmark.locations?.[0]?.latLng 
+          ? `${landmark.locations[0].latLng.latitude?.toFixed(2) ?? 'N/A'}, ${landmark.locations[0].latLng.longitude?.toFixed(2) ?? 'N/A'}`
+          : 'Position not available',
+        confidence: landmark.score ?? 0,
+        source: 'landmark',
+      })) || [];
+  
+      console.log('[performFullAnalysis] Landmarks:', landmarks);
+
+      // Process web entities
+      const webEntities = visionResult.webDetection?.webEntities?.map(entity => ({
+        name: entity.description,
+        confidence: entity.score ?? 0,
+        source: 'webEntity',
+      })) || [];
+      console.log('[performFullAnalysis] Web entities:', webEntities);
+  
+      // Cross-reference and merge results
+      const mergedResults = crossReferenceResults(landmarks, webEntities);
+  
+      let geminiResult = null;
+      let historicPhotos = initialHistoricPhotos;
+  
+      // If we have any results, get additional information
+      if (mergedResults.length > 0) {
+        const primaryResult = mergedResults[0];
+        console.log('[performFullAnalysis] Primary result:', primaryResult.name);
+  
+        const [geminiInfo, updatedHistoricPhotos] = await Promise.all([
+          ApiService.getGeminiInfo(primaryResult.name).catch(error => {
+            console.error('Error fetching Gemini info:', error);
+            return null;
+          }),
+          ApiService.searchHistoricPhotos(primaryResult.name).catch(error => {
+            console.error('Error fetching updated historic photos:', error);
+            return initialHistoricPhotos;  // Fallback to initial results
+          }),
+        ]);
+  
+        geminiResult = geminiInfo;
+        historicPhotos = updatedHistoricPhotos;
+      } else {
+        console.log('[performFullAnalysis] No landmarks or web entities detected');
+      }
+  
+      console.log('[performFullAnalysis] Analysis completed successfully');
+      return { 
+        landmarks: mergedResults, 
+        webEntities: webEntities.slice(0, 3),  // Keep original top 3 web entities
+        historicPhotos, 
+        geminiResult 
+      };
+    } catch (error) {
+      console.error('[performFullAnalysis] Error:', error);
+      throw new Error(`Failed to perform full analysis: ${error.message}`);
     }
   };
 
+  const crossReferenceResults = (landmarks, webEntities) => {
+    const results = [...landmarks];
+
+    webEntities.forEach(entity => {
+      const matchingLandmark = landmarks.find(landmark =>
+        landmark.name.toLowerCase().includes(entity.name.toLowerCase()) ||
+        entity.name.toLowerCase().includes(landmark.name.toLowerCase())
+      );
+
+      if (matchingLandmark) {
+        matchingLandmark.confidence = Math.max(matchingLandmark.confidence, entity.confidence);
+        matchingLandmark.webEntityMatch = true;
+      } else {
+        results.push({
+          name: entity.name,
+          country: 'Unknown',
+          position: 'Position not available',
+          confidence: entity.confidence,
+          source: 'webEntity',
+        });
+      }
+    });
+
+    return results.sort((a, b) => {
+      if (a.webEntityMatch && !b.webEntityMatch) return -1;
+      if (!a.webEntityMatch && b.webEntityMatch) return 1;
+      return b.confidence - a.confidence;
+    });
+  };
+
+  const updateAnalysisInBackground = async (uri, hash) => {
+    try {
+      const updatedResult = await performFullAnalysis(uri);
+      await CachingService.setItem(`@ImageAnalysis_${hash}`, updatedResult);
+      setAnalysisResult(updatedResult);
+    } catch (error) {
+      console.error('Error updating analysis in background:', error);
+    }
+  };
 
   if (!photo) {
     return (
@@ -327,109 +243,97 @@ function ResultsScreen({ route }) {
   }
 
   return (
-    <ScrollView style={styles.container}>
-      <ImageBackground source={{ uri: photo?.uri }} style={styles.header}>
-        <BlurView intensity={5} style={styles.headerContent}>
-          <Text style={styles.headerTitle}>Results</Text>
-        </BlurView>
-      </ImageBackground>
+    <SafeAreaView style={{ flex: 1}}>
+      <ScrollView style={styles.container}>
 
-      {loading ? (
-        <View style={styles.loaderContainer}>
+        <ImageBackground source={{ uri: photo.uri }} style={styles.header}>
+          <BlurView intensity={70} style={styles.headerContent}>
+            <Text style={styles.headerTitle}>Results</Text>
+          </BlurView>
+        </ImageBackground>
+
+        {loading ? (
           <ActivityIndicator size="large" color="#0000ff" style={styles.loader}/>
-          <Text style={styles.loaderText}>{isAnalysing ? 'Analyzing image...' : 'Loading...'}</Text>
-        </View>
-      ) : error ? (
-        <View style={styles.section}>
+        ) : error ? (
           <Text style={styles.errorText}>{error}</Text>
-        </View> 
-      ) : (
-        <View style={styles.resultContainer}>
-          {landmarks.length > 0 && (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Landmark Detected</Text>
-              <View style={styles.landmarkItem}>
-                <Text style={styles.landmarkName}>{landmarks[0].name}</Text>
-                <Text style={styles.landmarkCountry}>{landmarks[0].country} ({landmarks[0].position})</Text>
-                <View style={styles.confidenceBar}>
-                  <View style={[styles.confidenceFill, { width: `${landmarks[0].confidence * 100}%` }]} />
+        ) : (
+          <View style={styles.resultContainer}>
+            {analysisResult.landmarks.length > 0 && (
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Landmark Detected</Text>
+                <View style={styles.landmarkItem}>
+                  <Text style={styles.landmarkName}>{analysisResult.landmarks[0].name}</Text>
+                  <Text style={styles.landmarkCountry}>{analysisResult.landmarks[0].country} ({analysisResult.landmarks[0].position?.lat}, {analysisResult.landmarks[0].position?.long})</Text>
+                  <View style={styles.confidenceBar}>
+                    <View style={[styles.confidenceFill, { width: `${analysisResult.landmarks[0].confidence * 100}%` }]} />
+                  </View>
+                  <Text style={styles.confidence}>Confidence: {(analysisResult.landmarks[0].confidence * 100).toFixed(2)}%</Text>
                 </View>
-                <Text style={styles.confidence}>Confidence: {(landmarks[0].confidence * 100).toFixed(2)}%</Text>
               </View>
-            </View>
-          )}
-          
-          {historicPhotos.length > 0 ? (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Historic Photos</Text>
-              <Carousel
-                ref={carouselRef}
-                data={historicPhotos}
-                renderItem={renderHistoricPhoto}
-                sliderWidth={screenWidth * 0.8}
-                itemWidth={screenWidth * 0.6}
-                layout={'default'}
-                loop={true}
-                autoplay={true}
-                autoplayInterval={3000}
-                removeClippedSubviews={false}
-                useScrollView={true}
-              />
-              <TouchableOpacity onPress={() => handleSeeMore(landmarks[0]?.name)} style={styles.seeMoreButton}>
-                <Text style={styles.seeMoreButtonText}>See More</Text>
-              </TouchableOpacity>
-            </View>
-          ) : (
-            <View style={styles.section}>
+            )}
+
+            {analysisResult.historicPhotos.length > 0 ? (
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Historic Photos</Text>
+                <Carousel
+                  ref={carouselRef}
+                  data={analysisResult.historicPhotos}
+                  renderItem={renderHistoricPhoto}
+                  sliderWidth={screenWidth * 0.8}
+                  itemWidth={screenWidth * 0.6}
+                  layout={'default'}
+                  loop={true}
+                  autoplay={true}
+                  autoplayInterval={3000}
+                  removeClippedSubviews={false}
+                  useScrollView={true}
+                />
+                <TouchableOpacity onPress={() => handleSeeMore(analysisResult.landmarks[0]?.name)} style={styles.seeMoreButton}>
+                  <Text style={styles.seeMoreButtonText}>See More</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
               <Text style={styles.noResultText}>No historic photos found 😔</Text>
-            </View>
-          )}
-          
-          {geminiResult ? (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>About</Text>
-              <ScrollView style={styles.geminiResultContainer}>
-                <Text style={styles.geminiResultText}>{geminiResult}</Text>
-              </ScrollView>
-            </View>
-          ) : (
-            <View style={styles.section}>
-              <Text style={styles.noResultText}>No information found 😔</Text>
-            </View>
-          )}
+            )}
 
-          {webEntities.length > 0 ? (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Related Entities</Text>
-              <View style={styles.entitiesContainer}>
-                {webEntities.map((entity, index) => (
-                    <TouchableOpacity key={index} style={styles.entityItem}>
-                      <Text style={styles.entityText}>{entity.description}</Text>
-                    </TouchableOpacity>
-                  ))}
+            {analysisResult.webEntities.length > 0 ? (
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Related Entities</Text>
+                <View style={styles.entitiesContainer}>
+                  {analysisResult.webEntities.map((entity, index) => (
+                      <TouchableOpacity key={index} style={styles.entityItem}>
+                        <Text style={styles.entityText}>{entity.name}</Text>
+
+                      </TouchableOpacity>
+                    ))}
+                </View>
               </View>
-            </View>
-          ) : 
-          (
-            <View style={styles.section}>
+            ) : (
               <Text style={styles.noResultText}>No related entities found 😔</Text>
-            </View>
-          )}
+            )}
 
-          <View style={styles.feedbackContainer}>
-            <Text style={styles.feedbackQuestion}>Was this information helpful?</Text>
-            <View style={styles.feedbackButtons}>
-              <TouchableOpacity onPress={() => handleFeedback(true)} style={[styles.feedbackButton, feedback === true && styles.selectedFeedback]}>
-                <Ionicons name="thumbs-up" size={24} color={feedback === true ? "white" : "black"} />
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => handleFeedback(false)} style={[styles.feedbackButton, feedback === false && styles.selectedFeedback]}>
-                <Ionicons name="thumbs-down" size={24} color={feedback === false ? "white" : "black"} />
-              </TouchableOpacity>
+            {analysisResult.geminiResult && (
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>About</Text>
+                <Text style={styles.entityText}>{analysisResult.geminiResult}</Text>
+              </View>
+            )}
+
+            <View style={styles.feedbackContainer}>
+              <Text style={styles.feedbackQuestion}>Was this information helpful?</Text>
+              <View style={styles.feedbackButtons}>
+                <TouchableOpacity onPress={() => handleFeedback(true)} style={[styles.feedbackButton, feedback === true && styles.selectedFeedback]}>
+                  <Ionicons name="thumbs-up" size={24} color={feedback === true ? "white" : "black"} />
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => handleFeedback(false)} style={[styles.feedbackButton, feedback === false && styles.selectedFeedback]}>
+                  <Ionicons name="thumbs-down" size={24} color={feedback === false ? "white" : "black"} />
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
-        </View>
-      )}
-    </ScrollView>
+        )}
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
@@ -444,7 +348,7 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
   header: {
-    height: screenHeight * 0.75,
+    height: screenHeight * 0.7,
     justifyContent: 'flex-end',
   },
   headerContent: {
@@ -491,7 +395,7 @@ const styles = StyleSheet.create({
     marginBottom: 5,
   },
   landmarkCountry: {
-    fontSize: 16,
+    fontSize: 13,
     color: '#666',
     marginBottom: 10,
   },
@@ -594,27 +498,11 @@ const styles = StyleSheet.create({
     // marginTop: 20,
     padding: 10,
   },
-  loader: {
-    marginTop: 50,
+  geminiInfo: {
+    fontSize: 18,
+    textAlign: 'center',
+    color: '#666',
+    marginTop: 20,
   },
-  geminiResultContainer: {
-    maxHeight: 200,
-    marginTop: 10,
-  },
-  geminiResultText: {
-    fontSize: 16,
-    color: '#333',
-    lineHeight: 24,
-  },
-  loaderContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 50,
-  },
-  loaderText: {
-    marginTop: 10,
-    fontSize: 16,
-    color: '#333',
-  },
+
 });
