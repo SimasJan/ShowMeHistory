@@ -94,6 +94,7 @@ export const ApiService = {
             throw error;
         }
     },
+    
     searchLandmarkEvents: async (landmarkName) => {
         console.log('Searching landmark events for:', landmarkName);
         try {
